@@ -340,23 +340,6 @@ class _PreTripFormPageState extends ConsumerState<PreTripFormPage> {
     return items;
   }
 
-  bool _isLoadReadinessTemplateItem(_CoreChecklistTemplateItem item) {
-    final code = item.code.toLowerCase();
-    final section = item.section.toLowerCase();
-    final label = item.label.toLowerCase();
-    return code.contains('load_area_ready') ||
-        code.contains('load_secured') ||
-        code.contains('load_within_weight') ||
-        code.contains('load_status') ||
-        code.contains('load') ||
-        section.contains('load readiness') ||
-        section.contains('load') ||
-        label.contains('load readiness') ||
-        label.contains('load area') ||
-        label.contains('load secured') ||
-        label.contains('within weight');
-  }
-
   Future<void> _pickPhoto(ValueSetter<XFile?> setter) async {
     final picker = ImagePicker();
     final file = await picker.pickImage(
@@ -424,6 +407,13 @@ class _PreTripFormPageState extends ConsumerState<PreTripFormPage> {
     if (section == 'engine_fluids' || section == 'engine') {
       return 'Engine & Fluids';
     }
+    if (section == 'tyres') return 'Tyres';
+    if (section == 'brakes') return 'Brakes';
+    if (section == 'steering') return 'Steering';
+    if (section == 'coupling') return 'Coupling';
+    if (section == 'safety') return 'Safety';
+    if (section == 'load') return 'Load';
+    if (section == 'docs' || section == 'documents') return 'Documents';
     if (section == 'documents') return 'Documents';
     return section
         .split('_')
@@ -989,46 +979,190 @@ class _CoreChecklistTemplateItem {
 
 const List<_CoreChecklistTemplateItem> _defaultTemplate = [
   _CoreChecklistTemplateItem(
-    code: 'vehicle_exterior.brakes',
-    label: 'Brakes',
-    section: 'Vehicle Exterior',
-    severityOnFail: 'warning',
-  ),
-  _CoreChecklistTemplateItem(
-    code: 'vehicle_exterior.tyres',
-    label: 'Tyres',
-    section: 'Vehicle Exterior',
-    severityOnFail: 'warning',
-  ),
-  _CoreChecklistTemplateItem(
-    code: 'vehicle_exterior.lights',
-    label: 'Lights',
-    section: 'Vehicle Exterior',
+    code: 'vehicle_exterior.lights_indicators_working',
+    label: 'Lights & indicators',
+    section: 'vehicle_exterior',
     severityOnFail: 'blocker',
   ),
   _CoreChecklistTemplateItem(
-    code: 'vehicle_exterior.mirrors',
-    label: 'Mirrors',
-    section: 'Vehicle Exterior',
+    code: 'vehicle_exterior.mirrors_windscreen_ok',
+    label: 'Mirrors & windscreen',
+    section: 'vehicle_exterior',
     severityOnFail: 'warning',
   ),
   _CoreChecklistTemplateItem(
-    code: 'engine_fluids.horn',
-    label: 'Horn',
-    section: 'Engine & Fluids',
+    code: 'vehicle_exterior.license_plate_visible',
+    label: 'License plate visible',
+    section: 'vehicle_exterior',
     severityOnFail: 'warning',
   ),
   _CoreChecklistTemplateItem(
-    code: 'engine_fluids.fuel_sufficient',
-    label: 'Fuel Sufficient',
-    section: 'Engine & Fluids',
+    code: 'vehicle_exterior.no_major_body_damage',
+    label: 'No major body damage',
+    section: 'vehicle_exterior',
     severityOnFail: 'warning',
   ),
   _CoreChecklistTemplateItem(
-    code: 'documents.accepted',
-    label: 'Inspection declaration acknowledged',
-    section: 'Documents',
+    code: 'tyres.pressure_all_wheels_ok',
+    label: 'Tyre pressure all wheels',
+    section: 'tyres',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'tyres.tread_depth_ok',
+    label: 'Tread depth',
+    section: 'tyres',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'tyres.no_cuts_bulges_exposed_cord',
+    label: 'No tyre cuts/bulges/exposed cord',
+    section: 'tyres',
     severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'tyres.wheel_nuts_secure',
+    label: 'Wheel nuts secure',
+    section: 'tyres',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'brakes.service_brake_ok',
+    label: 'Service brake',
+    section: 'brakes',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'brakes.parking_brake_ok',
+    label: 'Parking brake',
+    section: 'brakes',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'brakes.air_or_brake_warning_clear',
+    label: 'Brake warning clear',
+    section: 'brakes',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'steering.steering_response_ok',
+    label: 'Steering response',
+    section: 'steering',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'engine.engine_oil_level_ok',
+    label: 'Engine oil level',
+    section: 'engine',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'engine.coolant_level_ok',
+    label: 'Coolant level',
+    section: 'engine',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'engine.brake_fluid_level_ok',
+    label: 'Brake fluid level',
+    section: 'engine',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'engine.no_active_leaks',
+    label: 'No active leaks',
+    section: 'engine',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'coupling.kingpin_or_hitch_locked',
+    label: 'Kingpin/hitch locked',
+    section: 'coupling',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'coupling.air_electrical_lines_connected',
+    label: 'Air/electrical lines connected',
+    section: 'coupling',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'coupling.trailer_lights_working',
+    label: 'Trailer lights',
+    section: 'coupling',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'coupling.trailer_legs_raised_locked',
+    label: 'Trailer legs raised/locked',
+    section: 'coupling',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'safety.fire_extinguisher_present_charged',
+    label: 'Fire extinguisher present/charged',
+    section: 'safety',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'safety.warning_triangles_present',
+    label: 'Warning triangles present',
+    section: 'safety',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'safety.first_aid_kit_present',
+    label: 'First aid kit present',
+    section: 'safety',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'safety.seatbelt_driver_ok',
+    label: 'Driver seatbelt',
+    section: 'safety',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'docs.driver_license_valid',
+    label: 'Driver license valid',
+    section: 'docs',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'docs.vehicle_registration_present',
+    label: 'Vehicle registration present',
+    section: 'docs',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'docs.insurance_or_roadworthy_valid',
+    label: 'Insurance/roadworthy valid',
+    section: 'docs',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'docs.waybill_present',
+    label: 'Waybill present',
+    section: 'docs',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'load.load_area_ready',
+    label: 'Load area ready',
+    section: 'load',
+    severityOnFail: 'warning',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'load.load_secured',
+    label: 'Load secured',
+    section: 'load',
+    severityOnFail: 'blocker',
+  ),
+  _CoreChecklistTemplateItem(
+    code: 'load.weight_within_limit',
+    label: 'Weight within limit',
+    section: 'load',
+    severityOnFail: 'warning',
   ),
 ];
 
@@ -1275,3 +1409,14 @@ class _PhotoPicker extends StatelessWidget {
     );
   }
 }
+  bool _isLoadReadinessTemplateItem(_CoreChecklistTemplateItem item) {
+    final code = item.code.toLowerCase().trim();
+    return code == 'load.load_area_ready' ||
+        code == 'load.load_secured' ||
+        code == 'load.weight_within_limit' ||
+        code == 'load.load_within_weight' ||
+        code.contains('load_area_ready') ||
+        code.contains('load_secured') ||
+        code.contains('weight_within_limit') ||
+        code.contains('load_within_weight');
+  }

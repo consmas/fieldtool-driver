@@ -99,17 +99,31 @@ class SyncManager {
   }
 
   Future<void> _flushLocationQueue() async {
-    final keys = _trackingBox.keys.toList();
+    final keys = _trackingBox.keys.toList()
+      ..sort((a, b) {
+        final left = _trackingBox.get(a);
+        final right = _trackingBox.get(b);
+        DateTime parse(Map? item) {
+          final raw = item?['recorded_at']?.toString();
+          return DateTime.tryParse(raw ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+        }
+        return parse(left).compareTo(parse(right));
+      });
     for (final key in keys) {
       final item = _trackingBox.get(key);
       if (item == null) continue;
       try {
+        double toDouble(dynamic value, {double fallback = 0}) {
+          if (value is num) return value.toDouble();
+          if (value is String) return double.tryParse(value) ?? fallback;
+          return fallback;
+        }
         await _trackingRepository.postLocationPing(
           tripId: item['trip_id'] as int,
-          lat: item['lat'] as double,
-          lng: item['lng'] as double,
-          speed: item['speed'] as double,
-          heading: item['heading'] as double,
+          lat: toDouble(item['lat']),
+          lng: toDouble(item['lng']),
+          speed: toDouble(item['speed']),
+          heading: toDouble(item['heading']),
           recordedAt: DateTime.parse(item['recorded_at'] as String),
         );
         await _trackingBox.delete(key);

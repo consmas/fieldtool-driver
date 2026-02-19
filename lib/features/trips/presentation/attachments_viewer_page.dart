@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -168,6 +169,15 @@ class _AttachmentsViewerPageState extends ConsumerState<AttachmentsViewerPage> {
     addRemote(title: 'Waybill', group: 'Waybill', url: _preTripValue(preTrip, 'waybill_photo_url'));
     addRemote(title: 'Inspector photo', group: 'Loading', url: _preTripValue(preTrip, 'inspector_photo_url'));
 
+    for (final asset in _extractChecklistAssets(bundle.preTrip)) {
+      if (asset.isSignature) continue;
+      addRemote(
+        title: asset.title,
+        group: 'Checklist',
+        url: asset.url,
+      );
+    }
+
     for (final e in bundle.evidence) {
       final url =
           e['photo_url']?.toString() ??
@@ -245,6 +255,25 @@ class _AttachmentsViewerPageState extends ConsumerState<AttachmentsViewerPage> {
           ),
         );
       });
+
+      for (final entry in q.payload.entries) {
+        final key = entry.key.toLowerCase();
+        final value = entry.value?.toString();
+        if (value == null || value.isEmpty) continue;
+        if (!key.contains('checklist')) continue;
+        if (!key.endsWith('_path')) continue;
+        if (!dedupe.add('local:$value')) continue;
+        items.add(
+          _ViewerItem(
+            title: 'Checklist photo',
+            group: 'Checklist',
+            localPath: value,
+            status: _statusForPath(value),
+            queueKey: q.key,
+            queueType: q.queueType,
+          ),
+        );
+      }
     }
     return items;
   }
@@ -332,6 +361,10 @@ class _AttachmentsViewerPageState extends ConsumerState<AttachmentsViewerPage> {
       _preTripValue(preTrip, 'inspector_signature_url'),
       _parseTime(_preTripValue(preTrip, 'accepted_at')),
     );
+    for (final asset in _extractChecklistAssets(bundle.preTrip)) {
+      if (!asset.isSignature) continue;
+      addSig(asset.title, asset.url, null);
+    }
 
     for (final q in mediaQueue) {
       if (q.payload['type']?.toString() != 'attachments') continue;
@@ -502,6 +535,75 @@ class _AttachmentsViewerPageState extends ConsumerState<AttachmentsViewerPage> {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
+
+  List<_ChecklistAsset> _extractChecklistAssets(Map<String, dynamic>? raw) {
+    if (raw == null) return const [];
+    final assets = <_ChecklistAsset>[];
+    final seen = <String>{};
+
+    void add(String keyPath, String url) {
+      if (url.isEmpty || !url.startsWith('http')) return;
+      if (!seen.add(url)) return;
+      final lower = keyPath.toLowerCase();
+      final isSignature = lower.contains('signature');
+      final title = isSignature ? 'Checklist signature' : 'Checklist image';
+      assets.add(_ChecklistAsset(title: title, url: url, isSignature: isSignature));
+    }
+
+    void walk(dynamic node, String path, {required bool onlyChecklist}) {
+      if (node is Map) {
+        node.forEach((k, v) {
+          final key = k.toString();
+          final nextPath = path.isEmpty ? key : '$path.$key';
+          final nextOnlyChecklist =
+              onlyChecklist || nextPath.toLowerCase().contains('core_checklist');
+          if (v is String) {
+            final lk = key.toLowerCase();
+            if (!nextOnlyChecklist) return;
+            final looksLikeImageKey =
+                lk.contains('photo') ||
+                lk.contains('image') ||
+                lk.contains('signature') ||
+                lk.contains('attachment') ||
+                lk.contains('file');
+            if (looksLikeImageKey && lk.contains('url')) {
+              add(nextPath, v);
+            }
+          } else {
+            walk(v, nextPath, onlyChecklist: nextOnlyChecklist);
+          }
+        });
+      } else if (node is List) {
+        for (var i = 0; i < node.length; i++) {
+          walk(node[i], '$path[$i]', onlyChecklist: onlyChecklist);
+        }
+      }
+    }
+
+    final normalized = _normalizedPreTrip(raw);
+    walk(normalized['core_checklist'], 'core_checklist', onlyChecklist: true);
+    final checklistJson = normalized['core_checklist_json'];
+    if (checklistJson is String && checklistJson.trim().isNotEmpty) {
+      try {
+        walk(jsonDecode(checklistJson), 'core_checklist_json', onlyChecklist: true);
+      } catch (_) {}
+    } else {
+      walk(checklistJson, 'core_checklist_json', onlyChecklist: true);
+    }
+    return assets;
+  }
+}
+
+class _ChecklistAsset {
+  const _ChecklistAsset({
+    required this.title,
+    required this.url,
+    required this.isSignature,
+  });
+
+  final String title;
+  final String url;
+  final bool isSignature;
 }
 
 class _AttachmentsBundle {
@@ -863,4 +965,3 @@ class _ImagePreviewPage extends StatelessWidget {
     );
   }
 }
-

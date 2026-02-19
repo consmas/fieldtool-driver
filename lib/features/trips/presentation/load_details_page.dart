@@ -248,13 +248,19 @@ class _LoadDetailsPageState extends ConsumerState<LoadDetailsPage> {
       final note = _loadNoteController.text.trim();
       final composedNote =
           '[seal_status=$_sealStatus]${note.isEmpty ? '' : ' $note'}';
+      final loadSecuredFinal = _loadSecured || _sealStatus == 'intact';
+      final loadAccepted = true;
+      final canMarkLoaded =
+          _loadAreaReady && _loadWithinWeight && loadSecuredFinal && loadAccepted;
 
       final fields = <String, dynamic>{
         'pre_trip[load_area_ready]': _loadAreaReady,
         'pre_trip[load_status]': _loadStatus,
-        'pre_trip[load_secured]': _sealStatus == 'intact',
+        'pre_trip[load_secured]': loadSecuredFinal,
         'pre_trip[load_within_weight]': _loadWithinWeight,
         'pre_trip[load_note]': composedNote,
+        'pre_trip[accepted]': loadAccepted,
+        'pre_trip[accepted_at]': DateTime.now().toIso8601String(),
         'pre_trip[assistant_name]': _assistantNameController.text.trim().isEmpty
             ? null
             : _assistantNameController.text.trim(),
@@ -294,12 +300,19 @@ class _LoadDetailsPageState extends ConsumerState<LoadDetailsPage> {
         securitySignature: _securitySignature,
       );
 
-      if (_loadSecured || _sealStatus == 'intact') {
+      if (canMarkLoaded) {
         try {
           await repo.updateStatus(widget.tripId, 'loaded');
         } catch (e, st) {
           Logger.e('Set status loaded failed', e, st);
         }
+      } else {
+        Logger.d(
+          'Load status remains unchanged for trip ${widget.tripId}: '
+          'load_area_ready=$_loadAreaReady '
+          'load_secured=$loadSecuredFinal '
+          'load_within_weight=$_loadWithinWeight',
+        );
       }
 
       if (mounted) {

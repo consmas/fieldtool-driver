@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -208,15 +209,14 @@ class _StartTripPageState extends ConsumerState<StartTripPage> {
     try {
       final now = DateTime.now();
       setState(() => _departureTimestamp = now);
-      await ref.read(tripsRepositoryProvider).updateTrip(widget.tripId, {
+      final repo = ref.read(tripsRepositoryProvider);
+      await repo.updateTrip(widget.tripId, {
         'estimated_departure_time': now.toIso8601String(),
       });
+      await repo.updateStatus(widget.tripId, 'en_route');
       await ref
           .read(trackingServiceProvider.notifier)
           .startTracking(tripId: widget.tripId);
-      await ref
-          .read(tripsRepositoryProvider)
-          .updateStatus(widget.tripId, 'en_route');
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -230,12 +230,35 @@ class _StartTripPageState extends ConsumerState<StartTripPage> {
     } catch (e, st) {
       Logger.e('Start trip failed', e, st);
       if (!mounted) return;
+      final msg = _friendlyStartError(e);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Start failed: $e')));
+      ).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  String _friendlyStartError(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      String? details;
+      if (data is Map) {
+        details =
+            data['error']?.toString() ??
+            data['message']?.toString() ??
+            data['errors']?.toString();
+      } else if (data != null) {
+        details = data.toString();
+      }
+      if (status == 422) {
+        return details == null || details.isEmpty
+            ? 'Start failed: backend rejected this status transition (422).'
+            : 'Start failed: $details';
+      }
+    }
+    return 'Start failed: $e';
   }
 
   @override

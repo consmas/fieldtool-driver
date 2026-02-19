@@ -215,9 +215,13 @@ class Trip {
       hasAfterLoadingEvidence:
           (json['has_after_loading_evidence'] ?? false) == true,
       destinationLat:
-          toDouble(json['destination_lat']) ?? toDouble(json['dropoff_lat']),
+          toDouble(json['destination_lat']) ??
+          toDouble(json['delivery_lat']) ??
+          toDouble(json['dropoff_lat']),
       destinationLng:
-          toDouble(json['destination_lng']) ?? toDouble(json['dropoff_lng']),
+          toDouble(json['destination_lng']) ??
+          toDouble(json['delivery_lng']) ??
+          toDouble(json['dropoff_lng']),
       latestLocationLat: toDouble(
         (json['latest_location'] as Map<String, dynamic>?)?['lat'],
       ),

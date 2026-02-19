@@ -1,21 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hive/hive.dart';
 
 import '../../../core/utils/logger.dart';
 import '../../../ui_kit/models/enums.dart' as kit_enums;
 import '../../../ui_kit/theme/app_colors.dart';
 import '../../../ui_kit/theme/app_spacing.dart';
+import '../../../ui_kit/widgets/badges.dart';
 import '../../../ui_kit/widgets/buttons.dart';
 import '../../../ui_kit/widgets/cards.dart';
 import '../../../ui_kit/widgets/navigation.dart' as kit_nav;
 import '../../evidence/presentation/capture_evidence_page.dart';
+import '../../chat/data/chat_repository.dart';
+import '../../chat/presentation/trip_chat_page.dart';
+import '../../offline/hive_boxes.dart';
 import '../../tracking/service/tracking_service.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import '../domain/trip_stop.dart';
 import 'delivery_completion_page.dart';
 import 'fuel_post_trip_page.dart';
-import 'live_tracking_page.dart';
 import 'load_details_page.dart';
 import 'attachments_viewer_page.dart';
 import 'pre_trip_form_page.dart';
@@ -43,6 +49,10 @@ final preTripProvider = FutureProvider.family<Map<String, dynamic>?, int>((
   return ref.read(tripsRepositoryProvider).fetchPreTrip(id);
 });
 
+final tripChatUnreadProvider = FutureProvider.family<int, int>((ref, tripId) {
+  return ref.read(chatRepositoryProvider).fetchTripUnreadCount(tripId);
+});
+
 class TripDetailPage extends ConsumerWidget {
   const TripDetailPage({super.key, required this.tripId});
 
@@ -53,6 +63,8 @@ class TripDetailPage extends ConsumerWidget {
     final tripAsync = ref.watch(tripDetailProvider(tripId));
     final stopsAsync = ref.watch(tripStopsProvider(tripId));
     final preTripAsync = ref.watch(preTripProvider(tripId));
+    final unreadChatAsync = ref.watch(tripChatUnreadProvider(tripId));
+    final trackingState = ref.watch(trackingServiceProvider);
 
     Future<void> refreshTripData() async {
       await Future.wait([
@@ -80,6 +92,19 @@ class TripDetailPage extends ConsumerWidget {
               stops.isEmpty || stops.every((s) => s.arrivalTimeAtSite != null);
           final canCompleteTrip = allStopsCompleted && trip.hasOdometerEnd;
           final primaryLabel = _primaryCtaLabel(trip.status, canCompleteTrip);
+          final unreadChatCount = unreadChatAsync.maybeWhen(
+            data: (value) => value,
+            orElse: () => 0,
+          );
+          final sampleAge = trackingState.lastSampleAt == null
+              ? null
+              : DateTime.now().difference(trackingState.lastSampleAt!);
+          final liveSpeed =
+              (trackingState.currentSpeedKph != null &&
+                  sampleAge != null &&
+                  sampleAge.inSeconds <= 15)
+              ? trackingState.currentSpeedKph
+              : trip.latestLocationSpeedKph;
 
           Future<void> openPreTrip() async {
             final result = await Navigator.push<bool>(
@@ -111,13 +136,38 @@ class TripDetailPage extends ConsumerWidget {
             if (result == true) await refreshTripData();
           }
 
-          Future<void> callDispatch() async {
-            final contact =
-                trip.customerContactPhone ?? trip.driverContact ?? 'N/A';
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Dispatch contact: $contact')),
+          Future<void> openDispatchChat() async {
+            await Navigator.push<void>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => TripChatPage(
+                  tripId: trip.id,
+                  tripReference: trip.referenceCode,
+                  tripStatus: trip.status,
+                ),
+              ),
             );
+            ref.invalidate(tripChatUnreadProvider(trip.id));
+          }
+
+          Future<void> markArrivedFromTrackingCard() async {
+            try {
+              final repo = ref.read(tripsRepositoryProvider);
+              final now = DateTime.now().toIso8601String();
+              await repo.updateStatus(trip.id, 'arrived');
+              await repo.updateTrip(trip.id, {'arrival_time_at_site': now});
+              await refreshTripData();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Arrived status updated.')),
+              );
+            } catch (e, st) {
+              Logger.e('Mark arrived failed', e, st);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Failed to mark arrived: $e')),
+              );
+            }
           }
 
           Future<void> runPrimaryAction() async {
@@ -137,12 +187,7 @@ class TripDetailPage extends ConsumerWidget {
                   if (started == true) await refreshTripData();
                   return;
                 case 'en_route':
-                  await repo.updateStatus(trip.id, 'arrived');
-                  await refreshTripData();
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Trip marked as arrived.')),
-                  );
+                  await markArrivedFromTrackingCard();
                   return;
                 case 'arrived':
                   await Navigator.push<Map<String, dynamic>?>(
@@ -175,11 +220,9 @@ class TripDetailPage extends ConsumerWidget {
                   );
                   return;
                 case 'completed':
-                  await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => LiveTrackingPage(tripId: trip.id),
-                    ),
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Trip already completed.')),
                   );
                   return;
                 default:
@@ -251,7 +294,7 @@ class TripDetailPage extends ConsumerWidget {
                                     );
                                     break;
                                   case 'dispatch':
-                                    await callDispatch();
+                                    await openDispatchChat();
                                     break;
                                   case 'docs':
                                     await Navigator.push<void>(
@@ -265,20 +308,24 @@ class TripDetailPage extends ConsumerWidget {
                                     break;
                                 }
                               },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
                                   value: 'history',
                                   child: Text('View trip history'),
                                 ),
-                                PopupMenuItem(
+                                const PopupMenuItem(
                                   value: 'issue',
                                   child: Text('Report issue'),
                                 ),
                                 PopupMenuItem(
                                   value: 'dispatch',
-                                  child: Text('Contact dispatch'),
+                                  child: Text(
+                                    unreadChatCount > 0
+                                        ? 'Contact dispatch ($unreadChatCount)'
+                                        : 'Contact dispatch',
+                                  ),
                                 ),
-                                PopupMenuItem(
+                                const PopupMenuItem(
                                   value: 'docs',
                                   child: Text('Trip documents'),
                                 ),
@@ -290,10 +337,7 @@ class TripDetailPage extends ConsumerWidget {
                           pinned: true,
                           delegate: _SummaryStripDelegate(
                             child: kit_nav.TripSummaryStrip(
-                              destination:
-                                  trip.destination ??
-                                  trip.dropoffLocation ??
-                                  'Destination pending',
+                              destination: _destinationLabel(trip),
                               waybill: trip.waybillNumber ?? trip.referenceCode,
                               eta: _etaText(trip),
                               distanceRemaining: trip.distanceKm == null
@@ -319,8 +363,10 @@ class TripDetailPage extends ConsumerWidget {
                                 ),
                                 (
                                   icon: Icons.support_agent_outlined,
-                                  label: 'Dispatch',
-                                  onTap: callDispatch,
+                                  label: unreadChatCount > 0
+                                      ? 'Dispatch ($unreadChatCount)'
+                                      : 'Dispatch',
+                                  onTap: openDispatchChat,
                                 ),
                               ],
                             ),
@@ -342,17 +388,28 @@ class TripDetailPage extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: AppSpacing.md),
                                 SectionCard(
+                                  title: 'Dispatcher',
+                                  children: [
+                                    AppSecondaryButton(
+                                      label: unreadChatCount > 0
+                                          ? 'Chat with Dispatcher ($unreadChatCount)'
+                                          : 'Chat with Dispatcher',
+                                      leadingIcon: Icons.chat_bubble_outline,
+                                      onPressed: openDispatchChat,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                SectionCard(
                                   title: 'Live Stats',
                                   children: [
                                     StatGrid(
                                       stats: [
                                         StatBox(
                                           label: 'Speed',
-                                          value:
-                                              trip.latestLocationSpeedKph ==
-                                                  null
-                                              ? '—'
-                                              : '${trip.latestLocationSpeedKph!.toStringAsFixed(0)} km/h',
+                                          value: liveSpeed == null
+                                              ? 'Speed unavailable'
+                                              : '${liveSpeed.toStringAsFixed(0)} km/h',
                                           icon: Icons.speed,
                                           valueColor: AppColors.primaryBlue,
                                         ),
@@ -393,6 +450,11 @@ class TripDetailPage extends ConsumerWidget {
                                   ],
                                 ),
                                 const SizedBox(height: AppSpacing.md),
+                                _LiveTrackingStatusCard(
+                                  trip: trip,
+                                  onMarkArrived: markArrivedFromTrackingCard,
+                                ),
+                                const SizedBox(height: AppSpacing.md),
                                 SectionCard(
                                   title: 'Delivery Point Details',
                                   children: [
@@ -402,10 +464,7 @@ class TripDetailPage extends ConsumerWidget {
                                     ),
                                     InfoRow(
                                       label: 'Destination',
-                                      value:
-                                          trip.destination ??
-                                          trip.dropoffLocation ??
-                                          '—',
+                                      value: _destinationLabel(trip),
                                     ),
                                     InfoRow(
                                       label: 'Delivery Address',
@@ -518,6 +577,25 @@ class TripDetailPage extends ConsumerWidget {
     return '$time (${_durationFromNow(localEta)})';
   }
 
+  static String _destinationLabel(Trip trip) {
+    String? clean(String? value) {
+      final v = value?.trim();
+      if (v == null || v.isEmpty) return null;
+      return v;
+    }
+
+    final client = clean(trip.clientName);
+    final location =
+        clean(trip.destination) ??
+        clean(trip.deliveryAddress) ??
+        clean(trip.dropoffLocation);
+    if (client != null && location != null) {
+      final same = client.toLowerCase() == location.toLowerCase();
+      return same ? location : '$client - $location';
+    }
+    return location ?? client ?? 'Destination pending';
+  }
+
   static String _photosProgressText(Trip trip, Map<String, dynamic>? preTrip) {
     final count = _photoCount(trip, preTrip);
     const requiredCount = 6;
@@ -577,7 +655,7 @@ class TripDetailPage extends ConsumerWidget {
       case 'offloaded':
         return canCompleteTrip ? 'End Trip' : 'Capture End Odometer';
       case 'completed':
-        return 'View Live Tracking';
+        return 'Trip Completed';
       default:
         return 'Start Trip';
     }
@@ -655,5 +733,256 @@ class _SummaryStripDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _SummaryStripDelegate oldDelegate) {
     return child != oldDelegate.child;
+  }
+}
+
+class _LiveTrackingStatusCard extends ConsumerWidget {
+  const _LiveTrackingStatusCard({
+    required this.trip,
+    required this.onMarkArrived,
+  });
+
+  final Trip trip;
+  final Future<void> Function() onMarkArrived;
+
+  LatLng? _destinationLatLng() {
+    if (trip.destinationLat != null && trip.destinationLng != null) {
+      return LatLng(trip.destinationLat!, trip.destinationLng!);
+    }
+    return null;
+  }
+
+  LatLng? _fallbackTruckLatLng() {
+    if (trip.latestLocationLat != null && trip.latestLocationLng != null) {
+      return LatLng(trip.latestLocationLat!, trip.latestLocationLng!);
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final destination = _destinationLatLng();
+    final trackingState = ref.watch(trackingServiceProvider);
+
+    return SectionCard(
+      title: 'Live Tracking Status',
+      children: [
+        StreamBuilder<Position>(
+          stream: Geolocator.getPositionStream(),
+          builder: (context, snapshot) {
+            final truck =
+                (trackingState.currentLat != null &&
+                    trackingState.currentLng != null)
+                ? LatLng(trackingState.currentLat!, trackingState.currentLng!)
+                : (snapshot.hasData
+                      ? LatLng(
+                          snapshot.data!.latitude,
+                          snapshot.data!.longitude,
+                        )
+                      : _fallbackTruckLatLng());
+            final speedKph =
+                (trackingState.currentSpeedKph != null &&
+                    trackingState.currentSpeedKph!.isFinite)
+                ? trackingState.currentSpeedKph!.clamp(0, 999).toDouble()
+                : (snapshot.hasData
+                      ? (snapshot.data!.speed * 3.6).clamp(0, 999).toDouble()
+                      : (trip.latestLocationSpeedKph ?? 0));
+            final distanceKm = (truck != null && destination != null)
+                ? Geolocator.distanceBetween(
+                        truck.latitude,
+                        truck.longitude,
+                        destination.latitude,
+                        destination.longitude,
+                      ) /
+                      1000
+                : trip.distanceKm;
+            final etaLabel = _etaFromDistance(distanceKm, speedKph);
+            final elapsed = _elapsedLabel(trip.estimatedDepartureTime);
+
+            final markers = <Marker>{
+              if (truck != null)
+                Marker(
+                  markerId: const MarkerId('truck'),
+                  position: truck,
+                  infoWindow: const InfoWindow(title: 'Truck Position'),
+                ),
+              if (destination != null)
+                Marker(
+                  markerId: const MarkerId('destination'),
+                  position: destination,
+                  infoWindow: InfoWindow(
+                    title: trip.destination ?? 'Destination',
+                  ),
+                ),
+            };
+            final traveledPoints = trackingState.path
+                .map((point) => LatLng(point.lat, point.lng))
+                .toList(growable: false);
+            final polylines = <Polyline>{
+              if (traveledPoints.length >= 2)
+                Polyline(
+                  polylineId: const PolylineId('traveled_path'),
+                  color: AppColors.primaryBlueDark,
+                  width: 5,
+                  points: traveledPoints,
+                ),
+              if (truck != null && destination != null)
+                Polyline(
+                  polylineId: const PolylineId('route_hint'),
+                  color: AppColors.accentOrangeDark.withValues(alpha: 0.8),
+                  width: 3,
+                  points: [truck, destination],
+                  patterns: [PatternItem.dot, PatternItem.gap(8)],
+                ),
+            };
+
+            final pendingMedia = Hive.box<Map>(
+              HiveBoxes.evidenceQueue,
+            ).values.where((e) => e['trip_id'] == trip.id).length;
+            final pendingStatus = Hive.box<Map>(
+              HiveBoxes.statusQueue,
+            ).values.where((e) => e['trip_id'] == trip.id).length;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 170,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.neutral300),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: truck == null
+                      ? const Center(child: Text('Location unavailable'))
+                      : GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: truck,
+                            zoom: 13,
+                          ),
+                          myLocationEnabled: true,
+                          myLocationButtonEnabled: false,
+                          trafficEnabled: true,
+                          zoomControlsEnabled: false,
+                          markers: markers,
+                          polylines: polylines,
+                          onTap: (_) {
+                            showDialog<void>(
+                              context: context,
+                              builder: (_) => _ExpandedTrackingMapDialog(
+                                initial: truck,
+                                markers: markers,
+                                polylines: polylines,
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Tap map to expand full-screen.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                StatGrid(
+                  stats: [
+                    StatBox(
+                      label: 'Speed',
+                      value: '${speedKph.toStringAsFixed(1)} km/h',
+                      valueColor: AppColors.primaryBlue,
+                    ),
+                    StatBox(label: 'ETA', value: etaLabel),
+                    StatBox(
+                      label: 'Distance remaining',
+                      value: distanceKm == null
+                          ? '—'
+                          : '${distanceKm.toStringAsFixed(1)} km',
+                    ),
+                    StatBox(label: 'Elapsed', value: elapsed),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                InfoRow(
+                  label: 'Last location ping',
+                  value: snapshot.hasData ? 'Just now' : 'No live ping',
+                ),
+                InfoRow(
+                  label: 'Trip status sync',
+                  value: pendingStatus == 0
+                      ? 'Synced'
+                      : '$pendingStatus pending',
+                ),
+                InfoRow(
+                  label: 'Pending media count',
+                  value: '$pendingMedia',
+                  showDivider: false,
+                ),
+                if (pendingMedia > 0) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  AlertBanner(
+                    type: kit_enums.AlertType.warning,
+                    message:
+                        '$pendingMedia photos uploading when signal improves',
+                  ),
+                ],
+                if (trip.status == 'en_route') ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  AppPrimaryButton(
+                    label: "📍 I've Arrived — Mark Arrived",
+                    variant: PrimaryButtonVariant.green,
+                    onPressed: onMarkArrived,
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  static String _etaFromDistance(double? distanceKm, double speedKph) {
+    if (distanceKm == null || speedKph <= 1) return '—';
+    final minutes = ((distanceKm / speedKph) * 60).round();
+    final eta = DateTime.now().add(Duration(minutes: minutes));
+    final hh = eta.hour.toString().padLeft(2, '0');
+    final mm = eta.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  static String _elapsedLabel(DateTime? start) {
+    if (start == null) return '—';
+    final d = DateTime.now().difference(start);
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    return '${h}h ${m}m';
+  }
+}
+
+class _ExpandedTrackingMapDialog extends StatelessWidget {
+  const _ExpandedTrackingMapDialog({
+    required this.initial,
+    required this.markers,
+    required this.polylines,
+  });
+
+  final LatLng initial;
+  final Set<Marker> markers;
+  final Set<Polyline> polylines;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Live Map')),
+      body: GoogleMap(
+        initialCameraPosition: CameraPosition(target: initial, zoom: 14),
+        myLocationEnabled: true,
+        trafficEnabled: true,
+        markers: markers,
+        polylines: polylines,
+      ),
+    );
   }
 }

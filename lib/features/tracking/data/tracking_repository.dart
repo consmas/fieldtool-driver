@@ -17,12 +17,14 @@ class TrackingRepository {
     required double heading,
     required DateTime recordedAt,
   }) async {
+    final speedKph = speed.isFinite ? speed.clamp(0, 999).toDouble() : 0.0;
+    final headingDeg = heading.isFinite ? heading.clamp(0, 360).toDouble() : 0.0;
     await _dio.post(Endpoints.tripLocations(tripId), data: {
       'location': {
         'lat': lat,
         'lng': lng,
-        'speed': speed,
-        'heading': heading,
+        'speed': speedKph,
+        'heading': headingDeg,
         'recorded_at': recordedAt.toIso8601String(),
       },
     });

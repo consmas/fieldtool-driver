@@ -69,8 +69,18 @@ class TripsRepository {
   }
 
   Future<List<Map<String, dynamic>>> fetchTripEvidence(int tripId) async {
-    final response = await _dio.get(Endpoints.tripEvidence(tripId));
-    final data = response.data;
+    dynamic data;
+    try {
+      final response = await _dio.get(Endpoints.tripEvidence(tripId));
+      data = response.data;
+    } on DioException catch (e) {
+      // Some backend environments do not expose GET /trips/:id/evidence yet.
+      // Treat 404 as "no evidence available" so UI can still load local/queued media.
+      if (e.response?.statusCode == 404) {
+        return const [];
+      }
+      rethrow;
+    }
 
     List<dynamic>? pickList(dynamic value) {
       if (value is List) return value;
@@ -99,6 +109,19 @@ class TripsRepository {
     try {
       await _dio.post(Endpoints.tripStatus(id), data: {'status': status});
     } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+        try {
+          await _dio.patch(
+            Endpoints.tripDetail(id),
+            data: {
+              'trip': {'status': status},
+            },
+          );
+          return;
+        } catch (_) {
+          rethrow;
+        }
+      }
       if (e.response == null) {
         final box = Hive.box<Map>(HiveBoxes.statusQueue);
         await box.add({
@@ -116,7 +139,20 @@ class TripsRepository {
     required int tripId,
     required String status,
   }) async {
-    await _dio.post(Endpoints.tripStatus(tripId), data: {'status': status});
+    try {
+      await _dio.post(Endpoints.tripStatus(tripId), data: {'status': status});
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+        await _dio.patch(
+          Endpoints.tripDetail(tripId),
+          data: {
+            'trip': {'status': status},
+          },
+        );
+        return;
+      }
+      rethrow;
+    }
   }
 
   Future<void> updateTrip(int id, Map<String, dynamic> fields) async {

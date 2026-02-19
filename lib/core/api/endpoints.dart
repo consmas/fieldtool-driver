@@ -12,4 +12,14 @@ class Endpoints {
   static String tripStops(int id) => '/trips/$id/stops';
   static String tripStop(int tripId, int stopId) => '/trips/$tripId/stops/$stopId';
   static String tripAttachments(int id) => '/trips/$id/attachments';
+  static const chatInbox = '/chat/inbox';
+  static String tripChat(int tripId) => '/trips/$tripId/chat';
+  static String tripChatMessages(int tripId) => '/trips/$tripId/chat/messages';
+  static String tripChatMessage(int tripId, int messageId) =>
+      '/trips/$tripId/chat/messages/$messageId';
+  static const chatConversations = '/chat/conversations';
+  static String chatConversation(int id) => '/chat/conversations/$id';
+  static String chatConversationMessages(int id) =>
+      '/chat/conversations/$id/messages';
+  static String chatConversationRead(int id) => '/chat/conversations/$id/read';
 }

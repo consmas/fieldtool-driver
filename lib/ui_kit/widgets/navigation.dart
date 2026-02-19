@@ -320,9 +320,9 @@ class ConsMasBottomNavBar extends StatelessWidget {
           label: 'Trips',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.location_on_outlined),
-          activeIcon: Icon(Icons.location_on),
-          label: 'Track',
+          icon: Icon(Icons.chat_bubble_outline),
+          activeIcon: Icon(Icons.chat_bubble),
+          label: 'Chat',
         ),
         BottomNavigationBarItem(
           icon: Badge(

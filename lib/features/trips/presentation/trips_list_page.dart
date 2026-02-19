@@ -13,6 +13,9 @@ import '../../../ui_kit/widgets/badges.dart';
 import '../../../ui_kit/widgets/list_items.dart' as kit_items;
 import '../../../ui_kit/widgets/navigation.dart' as kit_nav;
 import '../../offline/hive_boxes.dart';
+import '../../offline/presentation/offline_sync_queue_page.dart';
+import '../../profile/presentation/profile_page.dart';
+import '../../chat/presentation/general_chat_page.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import 'package:hive/hive.dart';
@@ -104,6 +107,9 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
     if (Hive.isBoxOpen(HiveBoxes.preTripQueue)) {
       count += Hive.box<Map>(HiveBoxes.preTripQueue).length;
     }
+    if (Hive.isBoxOpen(HiveBoxes.trackingPings)) {
+      count += Hive.box<Map>(HiveBoxes.trackingPings).length;
+    }
     return count;
   }
 
@@ -141,13 +147,40 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
         bottomNavigationBar: kit_nav.ConsMasBottomNavBar(
           currentIndex: _bottomNavIndex,
           pendingSyncCount: _pendingQueueCount(),
-          onTap: (index) {
-            setState(() => _bottomNavIndex = index);
-            if (index != 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Section coming next.')),
-              );
+          onTap: (index) async {
+            if (index == 0) {
+              setState(() => _bottomNavIndex = 0);
+              return;
             }
+            if (index == 1) {
+              setState(() => _bottomNavIndex = 1);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GeneralChatPage()),
+              );
+              if (!mounted) return;
+              setState(() => _bottomNavIndex = 0);
+              return;
+            }
+            if (index == 2) {
+              setState(() => _bottomNavIndex = 2);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const OfflineSyncQueuePage(),
+                ),
+              );
+              if (!mounted) return;
+              setState(() => _bottomNavIndex = 0);
+              return;
+            }
+            setState(() => _bottomNavIndex = 3);
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfilePage()),
+            );
+            if (!mounted) return;
+            setState(() => _bottomNavIndex = 0);
           },
         ),
         body: Stack(
@@ -243,6 +276,25 @@ class _TripsTabView extends StatelessWidget {
     }
   }
 
+  String _destinationLabel(Trip trip) {
+    String? clean(String? value) {
+      final v = value?.trim();
+      if (v == null || v.isEmpty) return null;
+      return v;
+    }
+
+    final client = clean(trip.clientName);
+    final location =
+        clean(trip.destination) ??
+        clean(trip.deliveryAddress) ??
+        clean(trip.dropoffLocation);
+    if (client != null && location != null) {
+      final same = client.toLowerCase() == location.toLowerCase();
+      return same ? location : '$client - $location';
+    }
+    return location ?? client ?? 'Destination pending';
+  }
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -290,10 +342,7 @@ class _TripsTabView extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: kit_items.TripCard(
                   tripId: 'Trip #${trip.id}',
-                  destination:
-                      trip.destination ??
-                      trip.dropoffLocation ??
-                      'Destination pending',
+                  destination: _destinationLabel(trip),
                   origin: trip.pickupLocation,
                   waybill: trip.waybillNumber ?? trip.referenceCode,
                   eta: etaOrDepart,
