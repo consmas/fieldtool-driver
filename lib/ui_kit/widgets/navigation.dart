@@ -52,11 +52,12 @@ class ConsMasAppBar extends StatelessWidget implements PreferredSizeWidget {
       shadowColor: Colors.black26,
       centerTitle: centerTitle,
       leading: showBackButton
-          ? (leading ?? IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-              tooltip: 'Back',
-            ))
+          ? (leading ??
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                  tooltip: 'Back',
+                ))
           : leading,
       title: Column(
         crossAxisAlignment: centerTitle
@@ -68,10 +69,7 @@ class ConsMasAppBar extends StatelessWidget implements PreferredSizeWidget {
             Text(subtitle!, style: AppTextStyles.appBarSubtitle),
         ],
       ),
-      actions: [
-        ...actions,
-        const SizedBox(width: 4),
-      ],
+      actions: [...actions, const SizedBox(width: 4)],
     );
   }
 }
@@ -106,12 +104,11 @@ class SurfaceAppBar extends StatelessWidget implements PreferredSizeWidget {
         icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
         onPressed: onBack ?? () => Navigator.of(context).maybePop(),
       ),
-      title: Text(title,
-          style: AppTextStyles.appBarTitle.copyWith(color: AppColors.textPrimary)),
-      actions: [
-        if (trailing != null) trailing!,
-        const SizedBox(width: 4),
-      ],
+      title: Text(
+        title,
+        style: AppTextStyles.appBarTitle.copyWith(color: AppColors.textPrimary),
+      ),
+      actions: [if (trailing != null) trailing!, const SizedBox(width: 4)],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Divider(height: 1, color: AppColors.neutral200),
@@ -168,57 +165,70 @@ class TripSummaryStrip extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Status + last updated
-          Row(children: [
-            _StatusPill(status: status),
-            const Spacer(),
-            if (lastUpdated != null)
-              Text(
-                'Updated $lastUpdated',
-                style: AppTextStyles.caption.copyWith(
-                  color: Colors.white54, fontSize: 10,
+          Row(
+            children: [
+              _StatusPill(status: status),
+              const Spacer(),
+              if (lastUpdated != null)
+                Text(
+                  'Updated $lastUpdated',
+                  style: AppTextStyles.caption.copyWith(
+                    color: Colors.white54,
+                    fontSize: 10,
+                  ),
                 ),
-              ),
-          ]),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
           // Destination
-          Row(children: [
-            const Icon(Icons.place, color: Colors.white70, size: 14),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                destination,
-                style: AppTextStyles.displaySmall.copyWith(color: Colors.white),
-                overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              const Icon(Icons.place, color: Colors.white70, size: 14),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  destination,
+                  style: AppTextStyles.displaySmall.copyWith(
+                    color: Colors.white,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
           // Waybill / ETA / Distance
-          Row(children: [
-            _SummaryChip(label: 'Waybill', value: waybill),
-            const SizedBox(width: AppSpacing.lg),
-            _SummaryChip(label: 'ETA', value: eta),
-            const SizedBox(width: AppSpacing.lg),
-            _SummaryChip(label: 'Distance', value: distanceRemaining),
-            if (speed != null) ...[
+          Row(
+            children: [
+              _SummaryChip(label: 'Waybill', value: waybill),
               const SizedBox(width: AppSpacing.lg),
-              _SummaryChip(label: 'Speed', value: speed!),
+              _SummaryChip(label: 'ETA', value: eta),
+              const SizedBox(width: AppSpacing.lg),
+              _SummaryChip(label: 'Distance', value: distanceRemaining),
+              if (speed != null) ...[
+                const SizedBox(width: AppSpacing.lg),
+                _SummaryChip(label: 'Speed', value: speed!),
+              ],
             ],
-          ]),
+          ),
           const SizedBox(height: AppSpacing.md),
           // Quick actions row
           Row(
-            children: quickActions.map((qa) => Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                child: QuickActionButton(
-                  icon: qa.icon,
-                  label: qa.label,
-                  onPressed: qa.onTap,
-                  onDark: true,
-                ),
-              ),
-            )).toList(),
+            children: quickActions
+                .map(
+                  (qa) => Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: QuickActionButton(
+                        icon: qa.icon,
+                        label: qa.label,
+                        onPressed: qa.onTap,
+                        onDark: true,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
         ],
       ),
@@ -231,19 +241,19 @@ class _StatusPill extends StatelessWidget {
   final TripStatus status;
 
   Color get _bg => switch (status) {
-    TripStatus.enRoute   => Colors.white.withValues(alpha: 0.15),
-    TripStatus.arrived   => AppColors.accentOrange.withValues(alpha: 0.25),
+    TripStatus.enRoute => Colors.white.withValues(alpha: 0.15),
+    TripStatus.arrived => AppColors.accentOrange.withValues(alpha: 0.25),
     TripStatus.offloaded => AppColors.successGreen.withValues(alpha: 0.25),
     TripStatus.completed => AppColors.successGreen.withValues(alpha: 0.25),
-    _                    => Colors.white.withValues(alpha: 0.10),
+    _ => Colors.white.withValues(alpha: 0.10),
   };
 
   Color get _fg => switch (status) {
-    TripStatus.enRoute   => const Color(0xFF90C4FF),
-    TripStatus.arrived   => const Color(0xFFFFC947),
+    TripStatus.enRoute => const Color(0xFF90C4FF),
+    TripStatus.arrived => const Color(0xFFFFC947),
     TripStatus.offloaded => const Color(0xFF69E876),
     TripStatus.completed => const Color(0xFF69E876),
-    _                    => Colors.white70,
+    _ => Colors.white70,
   };
 
   @override
@@ -255,17 +265,24 @@ class _StatusPill extends StatelessWidget {
         borderRadius: AppRadius.pillAll,
         border: Border.all(color: _fg.withValues(alpha: 0.35)),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (status.isLive)
-          Padding(
-            padding: const EdgeInsets.only(right: 5),
-            child: PulseDot(color: _fg, size: 5),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (status.isLive)
+            Padding(
+              padding: const EdgeInsets.only(right: 5),
+              child: PulseDot(color: _fg, size: 5),
+            ),
+          Text(
+            status.label.toUpperCase(),
+            style: AppTextStyles.badge.copyWith(
+              color: _fg,
+              fontSize: 10,
+              letterSpacing: 0.5,
+            ),
           ),
-        Text(
-          status.label.toUpperCase(),
-          style: AppTextStyles.badge.copyWith(color: _fg, fontSize: 10, letterSpacing: 0.5),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }
@@ -279,16 +296,28 @@ class _SummaryChip extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: AppTextStyles.caption.copyWith(color: Colors.white54, fontSize: 10)),
+      Text(
+        label,
+        style: AppTextStyles.caption.copyWith(
+          color: Colors.white54,
+          fontSize: 10,
+        ),
+      ),
       const SizedBox(height: 2),
-      Text(value, style: AppTextStyles.labelSmall.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+      Text(
+        value,
+        style: AppTextStyles.labelSmall.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     ],
   );
 }
 
 // ─────────────────────────────────────────────────────────────
 // CONSMAS BOTTOM NAV BAR
-// Branded 4-tab bottom navigation.
+// Branded 5-tab bottom navigation.
 // Usage (in Scaffold):
 //   bottomNavigationBar: ConsMasBottomNavBar(
 //     currentIndex: _tab,
@@ -336,6 +365,11 @@ class ConsMasBottomNavBar extends StatelessWidget {
             child: const Icon(Icons.upload),
           ),
           label: 'Sync',
+        ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.build_outlined),
+          activeIcon: Icon(Icons.build),
+          label: 'Maintenance',
         ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.person_outline),
@@ -403,7 +437,9 @@ class BottomActionBar extends StatelessWidget {
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Container(
       padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg, AppSpacing.md, AppSpacing.lg,
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
         AppSpacing.md + (bottomInset > 0 ? bottomInset : AppSpacing.sm),
       ),
       decoration: const BoxDecoration(
@@ -418,13 +454,15 @@ class BottomActionBar extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: SaveStateIndicator(state: saveState!),
             ),
-          Row(children: [
-            if (secondary != null) ...[
-              Expanded(flex: 4, child: secondary!),
-              const SizedBox(width: AppSpacing.sm),
+          Row(
+            children: [
+              if (secondary != null) ...[
+                Expanded(flex: 4, child: secondary!),
+                const SizedBox(width: AppSpacing.sm),
+              ],
+              Expanded(flex: secondary != null ? 6 : 10, child: primary),
             ],
-            Expanded(flex: secondary != null ? 6 : 10, child: primary),
-          ]),
+          ),
         ],
       ),
     );

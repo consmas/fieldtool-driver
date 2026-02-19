@@ -10,7 +10,8 @@ class Endpoints {
   static String tripOdometerEnd(int id) => '/trips/$id/odometer/end';
   static String tripPreTrip(int id) => '/trips/$id/pre_trip';
   static String tripStops(int id) => '/trips/$id/stops';
-  static String tripStop(int tripId, int stopId) => '/trips/$tripId/stops/$stopId';
+  static String tripStop(int tripId, int stopId) =>
+      '/trips/$tripId/stops/$stopId';
   static String tripAttachments(int id) => '/trips/$id/attachments';
   static const chatInbox = '/chat/inbox';
   static String tripChat(int tripId) => '/trips/$tripId/chat';
@@ -22,4 +23,13 @@ class Endpoints {
   static String chatConversationMessages(int id) =>
       '/chat/conversations/$id/messages';
   static String chatConversationRead(int id) => '/chat/conversations/$id/read';
+  static const maintenanceSnapshot = '/maintenance/my_vehicle';
+  static const maintenanceVehicleStatus = '/maintenance/my_vehicle/status';
+  static const maintenanceVehicleDocuments =
+      '/maintenance/my_vehicle/documents';
+  static const maintenanceVehicleWorkOrders =
+      '/maintenance/my_vehicle/work_orders';
+  static String maintenanceWorkOrderComments(int id) =>
+      '/maintenance/work_orders/$id/comments';
+  static const maintenanceAlerts = '/maintenance/alerts';
 }

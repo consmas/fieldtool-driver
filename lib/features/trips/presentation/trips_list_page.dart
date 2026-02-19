@@ -16,6 +16,7 @@ import '../../offline/hive_boxes.dart';
 import '../../offline/presentation/offline_sync_queue_page.dart';
 import '../../profile/presentation/profile_page.dart';
 import '../../chat/presentation/general_chat_page.dart';
+import '../../maintenance/presentation/maintenance_page.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import 'package:hive/hive.dart';
@@ -166,15 +167,23 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
               setState(() => _bottomNavIndex = 2);
               await Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (_) => const OfflineSyncQueuePage(),
-                ),
+                MaterialPageRoute(builder: (_) => const OfflineSyncQueuePage()),
               );
               if (!mounted) return;
               setState(() => _bottomNavIndex = 0);
               return;
             }
-            setState(() => _bottomNavIndex = 3);
+            if (index == 3) {
+              setState(() => _bottomNavIndex = 3);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MaintenancePage()),
+              );
+              if (!mounted) return;
+              setState(() => _bottomNavIndex = 0);
+              return;
+            }
+            setState(() => _bottomNavIndex = 4);
             await Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ProfilePage()),

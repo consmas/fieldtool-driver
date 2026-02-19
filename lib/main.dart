@@ -15,6 +15,7 @@ Future<void> main() async {
   await Hive.openBox<Map>(HiveBoxes.trackingPings);
   await Hive.openBox<Map>(HiveBoxes.evidenceQueue);
   await Hive.openBox<Map>(HiveBoxes.preTripQueue);
+  await Hive.openBox<Map>(HiveBoxes.maintenanceSnapshotCache);
   await BackgroundServiceInitializer.initialize();
 
   FlutterError.onError = (details) {

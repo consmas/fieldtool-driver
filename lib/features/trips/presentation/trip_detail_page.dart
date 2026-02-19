@@ -17,6 +17,7 @@ import '../../chat/data/chat_repository.dart';
 import '../../chat/presentation/trip_chat_page.dart';
 import '../../offline/hive_boxes.dart';
 import '../../tracking/service/tracking_service.dart';
+import '../../maintenance/data/maintenance_repository.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import '../domain/trip_stop.dart';
@@ -171,6 +172,48 @@ class TripDetailPage extends ConsumerWidget {
           }
 
           Future<void> runPrimaryAction() async {
+            Future<void> showMaintenanceDueBannerIfNeeded() async {
+              try {
+                final status = await ref
+                    .read(maintenanceRepositoryProvider)
+                    .fetchVehicleStatusOnly();
+                if (!context.mounted) return;
+                if (!status.isDueSoon && !status.isOverdue) return;
+                final messenger = ScaffoldMessenger.of(context);
+                messenger.clearMaterialBanners();
+                messenger.showMaterialBanner(
+                  MaterialBanner(
+                    backgroundColor: status.isOverdue
+                        ? AppColors.errorRedLight
+                        : AppColors.accentOrangeLight,
+                    content: Text(
+                      status.isOverdue
+                          ? 'Maintenance overdue for your vehicle. Inform dispatch.'
+                          : 'Maintenance is due soon for your vehicle.',
+                      style: TextStyle(
+                        color: status.isOverdue
+                            ? AppColors.errorRed
+                            : AppColors.accentOrangeDark,
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: messenger.hideCurrentMaterialBanner,
+                        child: const Text('Dismiss'),
+                      ),
+                    ],
+                  ),
+                );
+                Future.delayed(const Duration(seconds: 8), () {
+                  if (context.mounted) {
+                    messenger.hideCurrentMaterialBanner();
+                  }
+                });
+              } catch (_) {
+                // Non-blocking hook: maintenance check failure should not block trip completion UX.
+              }
+            }
+
             try {
               final repo = ref.read(tripsRepositoryProvider);
               switch (trip.status) {
@@ -218,6 +261,7 @@ class TripDetailPage extends ConsumerWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Trip completed.')),
                   );
+                  await showMaintenanceDueBannerIfNeeded();
                   return;
                 case 'completed':
                   if (!context.mounted) return;
