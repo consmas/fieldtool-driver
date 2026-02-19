@@ -17,6 +17,8 @@ import '../../offline/presentation/offline_sync_queue_page.dart';
 import '../../profile/presentation/profile_page.dart';
 import '../../chat/presentation/general_chat_page.dart';
 import '../../maintenance/presentation/maintenance_page.dart';
+import '../../notifications/data/notifications_repository.dart';
+import '../../notifications/presentation/notifications_inbox_page.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import 'package:hive/hive.dart';
@@ -111,6 +113,9 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
     if (Hive.isBoxOpen(HiveBoxes.trackingPings)) {
       count += Hive.box<Map>(HiveBoxes.trackingPings).length;
     }
+    if (Hive.isBoxOpen(HiveBoxes.fuelLogsQueue)) {
+      count += Hive.box<Map>(HiveBoxes.fuelLogsQueue).length;
+    }
     return count;
   }
 
@@ -125,6 +130,8 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
     }
 
     final tripsAsync = ref.watch(tripsListProvider);
+    final unreadAsync = ref.watch(notificationsUnreadCountProvider);
+    final unreadCount = unreadAsync.maybeWhen(data: (v) => v, orElse: () => 0);
 
     return DefaultTabController(
       length: 3,
@@ -137,6 +144,26 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
               onPressed: () => ref.invalidate(tripsListProvider),
+            ),
+            IconButton(
+              icon: Badge(
+                isLabelVisible: unreadCount > 0,
+                label: Text('$unreadCount'),
+                child: const Icon(
+                  Icons.notifications_none,
+                  color: Colors.white,
+                ),
+              ),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsInboxPage(),
+                  ),
+                );
+                if (!mounted) return;
+                ref.invalidate(notificationsUnreadCountProvider);
+              },
             ),
             IconButton(
               icon: const Icon(Icons.logout, color: Colors.white),

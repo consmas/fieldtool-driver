@@ -12,6 +12,7 @@ import '../../../ui_kit/theme/app_colors.dart';
 import '../../../ui_kit/theme/app_spacing.dart';
 import '../../../ui_kit/widgets/badges.dart';
 import '../../../ui_kit/widgets/list_items.dart';
+import '../../fuel/data/fuel_repository.dart';
 import '../../offline/hive_boxes.dart';
 import '../../tracking/data/tracking_repository.dart';
 import '../../trips/data/trips_repository.dart';
@@ -32,6 +33,7 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
   late final Box<Map> _mediaBox;
   late final Box<Map> _preTripBox;
   late final Box<Map> _pingBox;
+  late final Box<Map> _fuelBox;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _isOffline = false;
@@ -44,6 +46,7 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
     _mediaBox = Hive.box<Map>(HiveBoxes.evidenceQueue);
     _preTripBox = Hive.box<Map>(HiveBoxes.preTripQueue);
     _pingBox = Hive.box<Map>(HiveBoxes.trackingPings);
+    _fuelBox = Hive.box<Map>(HiveBoxes.fuelLogsQueue);
     _initConnectivity();
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final offline = !results.any((r) => r != ConnectivityResult.none);
@@ -89,6 +92,7 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
   Future<void> _retryEntry(_QueueEntry entry) async {
     final tripsRepo = ref.read(tripsRepositoryProvider);
     final trackingRepo = ref.read(trackingRepositoryProvider);
+    final fuelRepo = ref.read(fuelRepositoryProvider);
 
     setState(() => _statusByEntry[entry.id] = SyncStatus.syncing);
     _addLog('Syncing ${entry.title} (${entry.kind.label})');
@@ -120,6 +124,10 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
             recordedAt: DateTime.parse(entry.payload['recorded_at'] as String),
           );
           await _pingBox.delete(entry.key);
+          break;
+        case _QueueKind.fuel:
+          await fuelRepo.replayQueuedFuelLog(entry.payload);
+          await _fuelBox.delete(entry.key);
           break;
       }
       setState(() {
@@ -157,6 +165,11 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
         await _retryEntry(entry);
       }
 
+      final fuelEntries = _entriesForBox(_fuelBox, _QueueKind.fuel);
+      for (final entry in fuelEntries) {
+        await _retryEntry(entry);
+      }
+
       final pingEntries = _entriesForBox(_pingBox, _QueueKind.ping);
       for (final entry in pingEntries) {
         await _retryEntry(entry);
@@ -176,7 +189,11 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
   }
 
   int get _totalPending =>
-      _statusBox.length + _mediaBox.length + _preTripBox.length + _pingBox.length;
+      _statusBox.length +
+      _mediaBox.length +
+      _preTripBox.length +
+      _pingBox.length +
+      _fuelBox.length;
 
   @override
   Widget build(BuildContext context) {
@@ -203,6 +220,7 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
                     final p2 = [
                       ..._entriesForBox(_preTripBox, _QueueKind.preTrip),
                       ..._entriesForBox(_mediaBox, _QueueKind.media),
+                      ..._entriesForBox(_fuelBox, _QueueKind.fuel),
                     ];
                     final p3 = _entriesForBox(_pingBox, _QueueKind.ping);
 
@@ -240,7 +258,7 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
                           AlertBanner(
                             type: AlertType.info,
                             message:
-                                'Items sync in order: Status changes → Media uploads → Location pings',
+                                'Items sync in order: Status changes → Media/Fuel uploads → Location pings',
                           ),
                           const SizedBox(height: AppSpacing.md),
                           SyncQueueSection(
@@ -285,7 +303,9 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
                                     child: Text('No sync events yet.'),
                                   )
                                 else
-                                  ..._syncLog.take(30).map(
+                                  ..._syncLog
+                                      .take(30)
+                                      .map(
                                         (line) => Padding(
                                           padding: const EdgeInsets.only(
                                             bottom: 6,
@@ -294,9 +314,9 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
                                             alignment: Alignment.centerLeft,
                                             child: Text(
                                               line,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall,
                                             ),
                                           ),
                                         ),
@@ -309,7 +329,9 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
                             width: double.infinity,
                             child: ElevatedButton.icon(
                               onPressed:
-                                  (_isOffline || _retryAllRunning || _totalPending == 0)
+                                  (_isOffline ||
+                                      _retryAllRunning ||
+                                      _totalPending == 0)
                                   ? null
                                   : _forceRetryAll,
                               icon: _retryAllRunning
@@ -365,7 +387,8 @@ enum _QueueKind {
   status('Status'),
   preTrip('Pre-Trip'),
   media('Media'),
-  ping('Ping');
+  ping('Ping'),
+  fuel('Fuel');
 
   const _QueueKind(this.label);
   final String label;
@@ -375,6 +398,7 @@ enum _QueueKind {
     _QueueKind.preTrip => Icons.fact_check_outlined,
     _QueueKind.media => Icons.photo_outlined,
     _QueueKind.ping => Icons.my_location_outlined,
+    _QueueKind.fuel => Icons.local_gas_station_outlined,
   };
 }
 
@@ -415,6 +439,7 @@ class _QueueEntry {
       _QueueKind.preTrip => 'Trip #$tripId pre-trip payload',
       _QueueKind.media => _mediaTitle(tripId),
       _QueueKind.ping => 'Trip #$tripId location ping',
+      _QueueKind.fuel => _fuelTitle(tripId),
     };
   }
 
@@ -432,6 +457,15 @@ class _QueueEntry {
       return 'Trip #$tripId evidence: ${kind ?? 'photo'}';
     }
     return 'Trip #$tripId media payload';
+  }
+
+  String _fuelTitle(String tripId) {
+    final scope = payload['scope']?.toString() ?? 'trip';
+    if (scope == 'vehicle') {
+      final vehicleId = payload['vehicle_id']?.toString() ?? '-';
+      return 'Vehicle #$vehicleId fuel log';
+    }
+    return 'Trip #$tripId fuel log';
   }
 
   int _estimateSizeBytes(Map<String, dynamic> map) {

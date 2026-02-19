@@ -14,6 +14,10 @@ import '../../../ui_kit/theme/app_spacing.dart';
 import '../../../ui_kit/widgets/cards.dart';
 import '../../offline/hive_boxes.dart';
 import '../../offline/presentation/offline_sync_queue_page.dart';
+import '../../notifications/presentation/notifications_inbox_page.dart';
+import '../../notifications/presentation/notification_preferences_page.dart';
+import '../../fuel/presentation/vehicle_fuel_log_page.dart';
+import '../../fuel/presentation/fuel_insights_page.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -49,11 +53,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 
   Future<void> _bootstrap() async {
-    await Future.wait([
-      _loadPrefs(),
-      _loadTokenInfo(),
-      _initConnectivity(),
-    ]);
+    await Future.wait([_loadPrefs(), _loadTokenInfo(), _initConnectivity()]);
     if (!mounted) return;
     setState(() => _loading = false);
   }
@@ -71,7 +71,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     try {
       final parts = token.split('.');
       if (parts.length < 2) return;
-      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
       final claims = jsonDecode(payload) as Map<String, dynamic>;
       final sub = claims['sub']?.toString();
       final exp = claims['exp'];
@@ -109,6 +111,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     }
     if (Hive.isBoxOpen(HiveBoxes.trackingPings)) {
       count += Hive.box<Map>(HiveBoxes.trackingPings).length;
+    }
+    if (Hive.isBoxOpen(HiveBoxes.fuelLogsQueue)) {
+      count += Hive.box<Map>(HiveBoxes.fuelLogsQueue).length;
     }
     return count;
   }
@@ -183,7 +188,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
@@ -264,6 +271,74 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               onPressed: _openSyncQueue,
                               icon: const Icon(Icons.sync),
                               label: const Text('Open Offline Sync Queue'),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const NotificationsInboxPage(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.notifications_outlined),
+                              label: const Text('Open Notifications Inbox'),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const NotificationPreferencesPage(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.tune_outlined),
+                              label: const Text('Notification Preferences'),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const VehicleFuelLogPage(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.local_gas_station_outlined,
+                              ),
+                              label: const Text('Log Vehicle Fuel (Off-Trip)'),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const FuelInsightsPage(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.insights_outlined),
+                              label: const Text('Fuel Efficiency Insights'),
                             ),
                           ),
                           const SizedBox(height: AppSpacing.sm),

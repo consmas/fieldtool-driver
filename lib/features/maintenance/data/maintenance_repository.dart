@@ -359,12 +359,10 @@ class MaintenanceRepository {
         '/maintenance/my_vehicle',
         '/maintenance/snapshot',
         '/drivers/me/maintenance',
+        '/api/v1/reports/maintenance',
       ]);
       final combinedMap = _pickMap(combinedResponse.data);
-      if (combinedMap.isNotEmpty &&
-          (combinedMap['status'] != null ||
-              combinedMap['documents'] != null ||
-              combinedMap['work_orders'] != null)) {
+      if (combinedMap.isNotEmpty) {
         final snapshot = _parseSnapshotFromCombined(combinedMap, role);
         await _writeCache(snapshot);
         return MaintenanceSnapshotResult(snapshot: snapshot, fromCache: false);
@@ -520,16 +518,28 @@ class MaintenanceRepository {
     String? role,
   ) {
     final status = MaintenanceVehicleStatus.fromJson(
-      _pickMap(map['status'] ?? map['vehicle_status']),
+      _pickMap(
+        map['status'] ??
+            map['vehicle_status'] ??
+            map['summary'] ??
+            map['overview'] ??
+            map['data'],
+      ),
     );
     final documents = _pickList(
-      map['documents'],
+      map['documents'] ??
+          map['vehicle_documents'] ??
+          map['expiring_documents'] ??
+          map['expired_documents'],
     ).map(VehicleDocument.fromJson).toList();
     final workOrders = _pickList(
-      map['work_orders'],
+      map['work_orders'] ??
+          map['open_work_orders'] ??
+          map['maintenance_jobs'] ??
+          map['jobs'],
     ).map(WorkOrder.fromJson).toList();
     final alerts = _pickList(
-      map['alerts'],
+      map['alerts'] ?? map['notifications'] ?? map['maintenance_alerts'],
     ).map(MaintenanceAlert.fromJson).where(_isSupportedAlert).toList();
     final allowComments =
         map['allow_work_order_comments'] == true || _roleAllowsComments(role);

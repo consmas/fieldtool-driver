@@ -32,4 +32,19 @@ class Endpoints {
   static String maintenanceWorkOrderComments(int id) =>
       '/maintenance/work_orders/$id/comments';
   static const maintenanceAlerts = '/maintenance/alerts';
+  static const notifications = '/api/v1/notifications';
+  static const notificationsUnreadCount = '/api/v1/notifications/unread_count';
+  static String notificationById(int id) => '/api/v1/notifications/$id';
+  static String notificationMarkRead(int id) =>
+      '/api/v1/notifications/$id/read';
+  static String notificationArchive(int id) =>
+      '/api/v1/notifications/$id/archive';
+  static const notificationPreferences = '/api/v1/notification_preferences';
+  static const devices = '/api/v1/devices';
+  static String deviceByToken(String token) => '/api/v1/devices/$token';
+  static String tripFuelLogs(int tripId) => '/api/v1/trips/$tripId/fuel_logs';
+  static String vehicleFuelLogs(int vehicleId) =>
+      '/api/v1/vehicles/$vehicleId/fuel_logs';
+  static String fuelAnalysisDriver(int driverId) =>
+      '/api/v1/fuel/analysis/driver/$driverId';
 }

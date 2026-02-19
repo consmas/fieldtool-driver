@@ -7,12 +7,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/utils/logger.dart';
+import '../../../ui_kit/models/enums.dart';
 import '../../../ui_kit/theme/app_colors.dart';
 import '../../../ui_kit/theme/app_spacing.dart';
+import '../../../ui_kit/widgets/badges.dart';
 import '../../../ui_kit/widgets/buttons.dart';
 import '../../../ui_kit/widgets/cards.dart';
 import '../../../ui_kit/widgets/forms.dart';
 import '../../../ui_kit/widgets/navigation.dart';
+import '../../fuel/data/fuel_repository.dart';
 import '../data/trips_repository.dart';
 
 class FuelPostTripPage extends ConsumerStatefulWidget {
@@ -34,6 +37,8 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
 
   final _stationController = TextEditingController();
   final _litresController = TextEditingController();
+  final _costController = TextEditingController();
+  final _fuelOdometerController = TextEditingController();
   final _receiptController = TextEditingController();
   final _inspectorController = TextEditingController();
   final _odometerController = TextEditingController();
@@ -55,6 +60,8 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
   String? _loadSummary;
   bool _savingFuel = false;
   bool _savingPostTrip = false;
+  bool _fullTankFill = false;
+  List<FuelLogSubmission> _recentFuelLogs = const [];
 
   @override
   void initState() {
@@ -67,6 +74,8 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
   void dispose() {
     _stationController.dispose();
     _litresController.dispose();
+    _costController.dispose();
+    _fuelOdometerController.dispose();
     _receiptController.dispose();
     _inspectorController.dispose();
     _odometerController.dispose();
@@ -88,6 +97,7 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
           .fetchTrip(widget.tripId);
       _stationController.text = trip.fuelStationUsed ?? '';
       _litresController.text = trip.fuelLitresFilled ?? '';
+      _costController.text = '';
       _receiptController.text = trip.fuelReceiptNo ?? '';
 
       final incomingPaymentMode = trip.fuelPaymentMode;
@@ -106,6 +116,9 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
       _odometerController.text = trip.odometerEndKm == null
           ? ''
           : trip.odometerEndKm!.toStringAsFixed(1);
+      _fuelOdometerController.text = trip.odometerEndKm == null
+          ? (trip.odometerStartKm?.toStringAsFixed(1) ?? '')
+          : trip.odometerEndKm!.toStringAsFixed(1);
       _existingProofOfFuellingUrl = trip.proofOfFuellingUrl;
       _existingEndOdometerPhotoUrl = trip.endOdometerPhotoUrl;
       _existingEndOdometerPhoto =
@@ -113,6 +126,7 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
           trip.endOdometerPhotoUrl!.isNotEmpty;
       _loadSummary =
           'trip=${trip.id} status=${trip.status} payment=$_paymentMode vehicle=$_vehicleCondition end_odo=${trip.odometerEndKm ?? '-'}';
+      await _loadRecentFuelLogs();
     } catch (e, st) {
       Logger.e('Failed to load trip for fuel/post-trip', e, st);
       if (mounted) {
@@ -130,6 +144,14 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
     }
   }
 
+  Future<void> _loadRecentFuelLogs() async {
+    final logs = await ref
+        .read(fuelRepositoryProvider)
+        .recentSubmissions(tripId: widget.tripId, limit: 8);
+    if (!mounted) return;
+    setState(() => _recentFuelLogs = logs);
+  }
+
   Future<void> _pickImage(ValueSetter<XFile?> setter) async {
     final picker = ImagePicker();
     final file = await picker.pickImage(
@@ -143,8 +165,45 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
 
   Future<void> _submitFuel() async {
     if (_savingFuel || _savingPostTrip) return;
+    final litres = double.tryParse(_litresController.text.trim());
+    final cost = double.tryParse(_costController.text.trim());
+    final odo = double.tryParse(_fuelOdometerController.text.trim());
+
+    if (litres == null || litres <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid litres (> 0).')),
+      );
+      return;
+    }
+    if (cost == null || cost <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid fuel cost (> 0).')),
+      );
+      return;
+    }
+    if (odo == null || odo <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter valid odometer value (> 0).')),
+      );
+      return;
+    }
+
     setState(() => _savingFuel = true);
     try {
+      await ref
+          .read(fuelRepositoryProvider)
+          .submitTripFuelLog(
+            tripId: widget.tripId,
+            litres: litres,
+            cost: cost,
+            odometerKm: odo,
+            fullTank: _fullTankFill,
+            station: _stationController.text.trim(),
+            note: _receiptController.text.trim().isEmpty
+                ? null
+                : 'receipt:${_receiptController.text.trim()}',
+          );
+
       final fields = {
         'fuel_station_used': _stationController.text.trim().isEmpty
             ? null
@@ -172,6 +231,7 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Fuel details saved.')));
+      await _loadRecentFuelLogs();
     } catch (e, st) {
       Logger.e('Fuel update failed', e, st);
       if (!mounted) return;
@@ -350,9 +410,57 @@ class _FuelPostTripPageState extends ConsumerState<FuelPostTripPage> {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 AppTextField(
+                  label: 'Fuel Cost',
+                  controller: _costController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppTextField(
+                  label: 'Odometer at Fueling (km)',
+                  controller: _fuelOdometerController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                AppTextField(
                   label: 'Fuel Receipt No.',
                   controller: _receiptController,
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                SwitchListTile.adaptive(
+                  value: _fullTankFill,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Full Tank Fill'),
+                  subtitle: const Text(
+                    'Mark this fueling as full-tank for efficiency tracking.',
+                  ),
+                  onChanged: (v) => setState(() => _fullTankFill = v),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SectionCard(
+              title: 'Last Fuel Submissions',
+              children: [
+                if (_recentFuelLogs.isEmpty)
+                  const Text('No recent fuel logs.')
+                else
+                  ..._recentFuelLogs.map((entry) {
+                    final syncStatus = switch (entry.status) {
+                      FuelLogSyncStatus.synced => SyncStatus.synced,
+                      FuelLogSyncStatus.failed => SyncStatus.failed,
+                      FuelLogSyncStatus.queued => SyncStatus.queued,
+                    };
+                    return InfoRow(
+                      label:
+                          '${entry.recordedAt.toLocal().toString().substring(0, 16)} · ${entry.litres.toStringAsFixed(1)}L',
+                      valueWidget: SyncStatusBadge(status: syncStatus),
+                      showDivider: entry != _recentFuelLogs.last,
+                    );
+                  }),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
