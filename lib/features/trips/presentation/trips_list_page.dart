@@ -15,10 +15,11 @@ import '../../../ui_kit/widgets/navigation.dart' as kit_nav;
 import '../../offline/hive_boxes.dart';
 import '../../offline/presentation/offline_sync_queue_page.dart';
 import '../../profile/presentation/profile_page.dart';
-import '../../chat/presentation/general_chat_page.dart';
-import '../../maintenance/presentation/maintenance_page.dart';
+import '../../home/presentation/driver_home_page.dart';
+import '../../incidents/presentation/incidents_page.dart';
 import '../../notifications/data/notifications_repository.dart';
 import '../../notifications/presentation/notifications_inbox_page.dart';
+import '../../driver_hub/presentation/driver_hub_page.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import 'package:hive/hive.dart';
@@ -46,7 +47,7 @@ class TripsListPage extends ConsumerStatefulWidget {
 class _TripsListPageState extends ConsumerState<TripsListPage> {
   late final StreamSubscription<List<ConnectivityResult>> _connectivitySub;
   bool _isOffline = false;
-  int _bottomNavIndex = 0;
+  int _bottomNavIndex = 1;
 
   @override
   void initState() {
@@ -116,6 +117,15 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
     if (Hive.isBoxOpen(HiveBoxes.fuelLogsQueue)) {
       count += Hive.box<Map>(HiveBoxes.fuelLogsQueue).length;
     }
+    if (Hive.isBoxOpen(HiveBoxes.driverDocumentsUploadQueue)) {
+      count += Hive.box<Map>(HiveBoxes.driverDocumentsUploadQueue).length;
+    }
+    if (Hive.isBoxOpen(HiveBoxes.incidentDraftsQueue)) {
+      count += Hive.box<Map>(HiveBoxes.incidentDraftsQueue).length;
+    }
+    if (Hive.isBoxOpen(HiveBoxes.incidentEvidenceQueue)) {
+      count += Hive.box<Map>(HiveBoxes.incidentEvidenceQueue).length;
+    }
     return count;
   }
 
@@ -144,6 +154,21 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.white),
               onPressed: () => ref.invalidate(tripsListProvider),
+            ),
+            IconButton(
+              icon: Badge(
+                isLabelVisible: _pendingQueueCount() > 0,
+                label: Text('${_pendingQueueCount()}'),
+                child: const Icon(Icons.sync_outlined, color: Colors.white),
+              ),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OfflineSyncQueuePage()),
+                );
+                if (!mounted) return;
+                setState(() {});
+              },
             ),
             IconButton(
               icon: Badge(
@@ -176,38 +201,40 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
           currentIndex: _bottomNavIndex,
           pendingSyncCount: _pendingQueueCount(),
           onTap: (index) async {
-            if (index == 0) {
-              setState(() => _bottomNavIndex = 0);
-              return;
-            }
             if (index == 1) {
               setState(() => _bottomNavIndex = 1);
+              return;
+            }
+            if (index == 0) {
+              setState(() => _bottomNavIndex = 0);
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const GeneralChatPage()),
+                MaterialPageRoute(builder: (_) => const DriverHomePage()),
               );
               if (!mounted) return;
-              setState(() => _bottomNavIndex = 0);
+              setState(() => _bottomNavIndex = 1);
               return;
             }
             if (index == 2) {
               setState(() => _bottomNavIndex = 2);
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const OfflineSyncQueuePage()),
+                MaterialPageRoute(
+                  builder: (_) => const DriverHubPage(initialTab: 2),
+                ),
               );
               if (!mounted) return;
-              setState(() => _bottomNavIndex = 0);
+              setState(() => _bottomNavIndex = 1);
               return;
             }
             if (index == 3) {
               setState(() => _bottomNavIndex = 3);
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const MaintenancePage()),
+                MaterialPageRoute(builder: (_) => const IncidentsPage()),
               );
               if (!mounted) return;
-              setState(() => _bottomNavIndex = 0);
+              setState(() => _bottomNavIndex = 1);
               return;
             }
             setState(() => _bottomNavIndex = 4);
@@ -216,7 +243,7 @@ class _TripsListPageState extends ConsumerState<TripsListPage> {
               MaterialPageRoute(builder: (_) => const ProfilePage()),
             );
             if (!mounted) return;
-            setState(() => _bottomNavIndex = 0);
+            setState(() => _bottomNavIndex = 1);
           },
         ),
         body: Stack(

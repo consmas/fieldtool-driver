@@ -6,6 +6,8 @@ import 'package:hive/hive.dart';
 
 import '../offline/hive_boxes.dart';
 import '../fuel/data/fuel_repository.dart';
+import '../driver_hub/data/driver_hub_repository.dart';
+import '../incidents/data/incidents_repository.dart';
 import '../tracking/data/tracking_repository.dart';
 import '../trips/data/trips_repository.dart';
 
@@ -16,9 +18,14 @@ class SyncManager {
     this._preTripBox,
     this._trackingBox,
     this._fuelLogsBox,
+    this._driverDocsQueueBox,
+    this._incidentDraftsQueueBox,
+    this._incidentEvidenceQueueBox,
     this._trackingRepository,
     this._tripsRepository,
     this._fuelRepository,
+    this._driverHubRepository,
+    this._incidentsRepository,
   );
 
   final Box<Map> _statusBox;
@@ -26,9 +33,14 @@ class SyncManager {
   final Box<Map> _preTripBox;
   final Box<Map> _trackingBox;
   final Box<Map> _fuelLogsBox;
+  final Box<Map> _driverDocsQueueBox;
+  final Box<Map> _incidentDraftsQueueBox;
+  final Box<Map> _incidentEvidenceQueueBox;
   final TrackingRepository _trackingRepository;
   final TripsRepository _tripsRepository;
   final FuelRepository _fuelRepository;
+  final DriverHubRepository _driverHubRepository;
+  final IncidentsRepository _incidentsRepository;
   StreamSubscription? _sub;
   bool _flushing = false;
 
@@ -50,6 +62,9 @@ class SyncManager {
       await _flushMediaQueue();
       await _flushLocationQueue();
       await _flushFuelLogsQueue();
+      await _flushDriverDocsQueue();
+      await _flushIncidentDraftsQueue();
+      await _flushIncidentEvidenceQueue();
     } finally {
       _flushing = false;
     }
@@ -169,6 +184,87 @@ class SyncManager {
     }
   }
 
+  Future<void> _flushDriverDocsQueue() async {
+    final keys = _driverDocsQueueBox.keys.toList()
+      ..sort((a, b) {
+        final left = _driverDocsQueueBox.get(a);
+        final right = _driverDocsQueueBox.get(b);
+        DateTime parse(Map? item) {
+          final raw = item?['created_at']?.toString();
+          return DateTime.tryParse(raw ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+        }
+
+        return parse(left).compareTo(parse(right));
+      });
+    for (final key in keys) {
+      final item = _driverDocsQueueBox.get(key);
+      if (item == null) continue;
+      try {
+        await _driverHubRepository.replayQueuedDocumentUpload(
+          Map<String, dynamic>.from(item),
+        );
+        await _driverDocsQueueBox.delete(key);
+      } catch (_) {
+        break;
+      }
+    }
+  }
+
+  Future<void> _flushIncidentDraftsQueue() async {
+    final keys = _incidentDraftsQueueBox.keys.toList()
+      ..sort((a, b) {
+        final left = _incidentDraftsQueueBox.get(a);
+        final right = _incidentDraftsQueueBox.get(b);
+        DateTime parse(Map? item) {
+          final raw = item?['created_at']?.toString();
+          return DateTime.tryParse(raw ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+        }
+
+        return parse(left).compareTo(parse(right));
+      });
+    for (final key in keys) {
+      final item = _incidentDraftsQueueBox.get(key);
+      if (item == null) continue;
+      try {
+        await _incidentsRepository.replayQueuedIncidentDraft(
+          Map<String, dynamic>.from(item),
+        );
+        await _incidentDraftsQueueBox.delete(key);
+      } catch (_) {
+        break;
+      }
+    }
+  }
+
+  Future<void> _flushIncidentEvidenceQueue() async {
+    final keys = _incidentEvidenceQueueBox.keys.toList()
+      ..sort((a, b) {
+        final left = _incidentEvidenceQueueBox.get(a);
+        final right = _incidentEvidenceQueueBox.get(b);
+        DateTime parse(Map? item) {
+          final raw = item?['created_at']?.toString();
+          return DateTime.tryParse(raw ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+        }
+
+        return parse(left).compareTo(parse(right));
+      });
+    for (final key in keys) {
+      final item = _incidentEvidenceQueueBox.get(key);
+      if (item == null) continue;
+      try {
+        await _incidentsRepository.replayQueuedIncidentEvidence(
+          Map<String, dynamic>.from(item),
+        );
+        await _incidentEvidenceQueueBox.delete(key);
+      } catch (_) {
+        break;
+      }
+    }
+  }
+
   void dispose() {
     _sub?.cancel();
   }
@@ -180,18 +276,28 @@ final syncManagerProvider = Provider<SyncManager>((ref) {
   final preTripBox = Hive.box<Map>(HiveBoxes.preTripQueue);
   final trackingBox = Hive.box<Map>(HiveBoxes.trackingPings);
   final fuelLogsBox = Hive.box<Map>(HiveBoxes.fuelLogsQueue);
+  final driverDocsQueue = Hive.box<Map>(HiveBoxes.driverDocumentsUploadQueue);
+  final incidentDraftsQueue = Hive.box<Map>(HiveBoxes.incidentDraftsQueue);
+  final incidentEvidenceQueue = Hive.box<Map>(HiveBoxes.incidentEvidenceQueue);
   final trackingRepo = ref.read(trackingRepositoryProvider);
   final tripsRepo = ref.read(tripsRepositoryProvider);
   final fuelRepo = ref.read(fuelRepositoryProvider);
+  final driverHubRepo = ref.read(driverHubRepositoryProvider);
+  final incidentsRepo = ref.read(incidentsRepositoryProvider);
   final manager = SyncManager(
     statusBox,
     mediaBox,
     preTripBox,
     trackingBox,
     fuelLogsBox,
+    driverDocsQueue,
+    incidentDraftsQueue,
+    incidentEvidenceQueue,
     trackingRepo,
     tripsRepo,
     fuelRepo,
+    driverHubRepo,
+    incidentsRepo,
   );
   manager.start();
   ref.onDispose(manager.dispose);

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/api/api_client.dart';
+import '../../../ui_kit/widgets/brand_logo.dart';
 import 'widgets/auth_text_field.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -64,7 +65,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF3A5F8E), Color(0xFF1A2540), Color(0xFF0F1420)],
+            colors: [Color(0xFF0A0E1A), Color(0xFF111827), Color(0xFF0F172A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -76,25 +77,24 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               children: [
                 const SizedBox(height: 28),
                 Container(
-                  width: 86,
-                  height: 86,
-                  padding: const EdgeInsets.all(8),
+                  width: 96,
+                  height: 96,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    color: const Color(0xFF0F172A),
+                    border: Border.all(color: const Color(0x33F59E0B)),
                   ),
-                  child: Image.asset(
-                    'assets/maxui/maxui/images/consmas_logo.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Image.asset(
-                      'assets/maxui/maxui/images/about-logo.png',
-                      fit: BoxFit.contain,
+                  child: const Center(
+                    child: AxleLogomark(
+                      size: 62,
+                      color: Color(0xFFF59E0B),
+                      centerFillColor: Color(0xFF0A0E1A),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'FieldTool Driver',
+                  'AXLE Driver',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 28,
@@ -103,7 +103,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'ConsMas Logistics Platform',
+                  'Fleet Intelligence Platform',
                   style: TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 28),

@@ -15,6 +15,7 @@ import '../../../ui_kit/widgets/navigation.dart' as kit_nav;
 import '../../evidence/presentation/capture_evidence_page.dart';
 import '../../chat/data/chat_repository.dart';
 import '../../chat/presentation/trip_chat_page.dart';
+import '../../incidents/presentation/incidents_page.dart';
 import '../../offline/hive_boxes.dart';
 import '../../tracking/service/tracking_service.dart';
 import '../../maintenance/data/maintenance_repository.dart';
@@ -151,6 +152,15 @@ class TripDetailPage extends ConsumerWidget {
             ref.invalidate(tripChatUnreadProvider(trip.id));
           }
 
+          Future<void> openIncidentReport() async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => IncidentsPage(initialTripId: trip.id),
+              ),
+            );
+          }
+
           Future<void> markArrivedFromTrackingCard() async {
             try {
               final repo = ref.read(tripsRepositoryProvider);
@@ -221,6 +231,22 @@ class TripDetailPage extends ConsumerWidget {
                 case 'loaded':
                 case 'draft':
                 case 'scheduled':
+                  final compliance = await repo.verifyTripCompliance(trip.id);
+                  final failures =
+                      compliance['blocking_failures'] ?? compliance['failures'];
+                  final hasBlockers = failures is List && failures.isNotEmpty;
+                  if (hasBlockers) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Trip blocked by compliance. Resolve ${failures.length} issue(s) first.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  if (!context.mounted) return;
                   final started = await Navigator.push<bool>(
                     context,
                     MaterialPageRoute(
@@ -429,6 +455,12 @@ class TripDetailPage extends ConsumerWidget {
                                       currentStep: progressStep,
                                     ),
                                   ],
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                _TripCompliancePanel(
+                                  tripId: trip.id,
+                                  tripStatus: trip.status,
+                                  onReportIncident: openIncidentReport,
                                 ),
                                 const SizedBox(height: AppSpacing.md),
                                 SectionCard(
@@ -777,6 +809,134 @@ class _SummaryStripDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _SummaryStripDelegate oldDelegate) {
     return child != oldDelegate.child;
+  }
+}
+
+class _TripCompliancePanel extends ConsumerStatefulWidget {
+  const _TripCompliancePanel({
+    required this.tripId,
+    required this.tripStatus,
+    required this.onReportIncident,
+  });
+
+  final int tripId;
+  final String tripStatus;
+  final Future<void> Function() onReportIncident;
+
+  @override
+  ConsumerState<_TripCompliancePanel> createState() =>
+      _TripCompliancePanelState();
+}
+
+class _TripCompliancePanelState extends ConsumerState<_TripCompliancePanel> {
+  bool _loading = false;
+  Map<String, dynamic>? _result;
+
+  bool get _isInTransit =>
+      widget.tripStatus == 'en_route' || widget.tripStatus == 'arrived';
+
+  bool _isBlocked(Map<String, dynamic> data) {
+    final blocked = data['blocked'];
+    if (blocked is bool) return blocked;
+    final failures = data['blocking_failures'] ?? data['failures'];
+    return failures is List && failures.isNotEmpty;
+  }
+
+  int _warningCount(Map<String, dynamic> data) {
+    final warnings = data['warnings'];
+    if (warnings is List) return warnings.length;
+    return 0;
+  }
+
+  int _blockerCount(Map<String, dynamic> data) {
+    final failures = data['blocking_failures'] ?? data['failures'];
+    if (failures is List) return failures.length;
+    return 0;
+  }
+
+  Future<void> _runCheck() async {
+    setState(() => _loading = true);
+    try {
+      final result = await ref
+          .read(tripsRepositoryProvider)
+          .verifyTripCompliance(widget.tripId);
+      if (!mounted) return;
+      setState(() => _result = result);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Compliance check failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _result;
+    final blocked = result == null ? false : _isBlocked(result);
+    final warnings = result == null ? 0 : _warningCount(result);
+    final blockers = result == null ? 0 : _blockerCount(result);
+
+    return SectionCard(
+      title: _isInTransit ? 'In-Transit Safety' : 'Pre-Departure Compliance',
+      children: [
+        if (result != null)
+          AlertBanner(
+            type: blocked
+                ? kit_enums.AlertType.error
+                : (warnings > 0
+                      ? kit_enums.AlertType.warning
+                      : kit_enums.AlertType.success),
+            message: blocked
+                ? 'Not ready. $blockers blocking item(s). Fix before departure.'
+                : (warnings > 0
+                      ? 'Ready with $warnings warning(s).'
+                      : 'Ready. No blocking issues found.'),
+          )
+        else
+          Text(
+            _isInTransit
+                ? 'Monitor compliance flags while en-route and report incidents quickly.'
+                : 'Run readiness check before departure to identify blockers and warnings.',
+          ),
+        const SizedBox(height: AppSpacing.sm),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 390;
+            final checkBtn = AppSecondaryButton(
+              label: _loading ? 'Checking...' : 'Run readiness check',
+              leadingIcon: Icons.fact_check_outlined,
+              onPressed: _loading ? null : _runCheck,
+            );
+            final incidentBtn = AppSecondaryButton(
+              label: 'Report Incident',
+              leadingIcon: Icons.warning_amber_outlined,
+              onPressed: widget.onReportIncident,
+            );
+
+            if (compact) {
+              return Column(
+                children: [
+                  SizedBox(width: double.infinity, child: checkBtn),
+                  const SizedBox(height: AppSpacing.sm),
+                  SizedBox(width: double.infinity, child: incidentBtn),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: checkBtn),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(child: incidentBtn),
+              ],
+            );
+          },
+        ),
+      ],
+    );
   }
 }
 

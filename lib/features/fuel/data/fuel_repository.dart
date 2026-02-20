@@ -270,13 +270,16 @@ class FuelRepository {
   Future<DriverFuelAnalysis> fetchDriverAnalysis({
     required int driverId,
   }) async {
+    if (driverId <= 0) {
+      throw Exception('Invalid driver id for fuel analysis.');
+    }
     final role = await _currentRole();
     final canAccess =
-        role == null ||
-        role == 'driver' ||
         role == 'admin' ||
         role == 'dispatcher' ||
-        role == 'supervisor';
+        role == 'supervisor' ||
+        role == 'fleet_manager' ||
+        role == 'manager';
     if (!canAccess) {
       throw Exception(
         'Role $role is not allowed to view driver fuel analysis.',
@@ -300,7 +303,15 @@ class FuelRepository {
         base64Url.decode(base64Url.normalize(parts[1])),
       );
       final claims = jsonDecode(payload) as Map<String, dynamic>;
-      return claims['role']?.toString().toLowerCase();
+      final role = claims['role']?.toString().toLowerCase();
+      if (role != null && role.isNotEmpty) return role;
+      final scope = claims['scp']?.toString().toLowerCase();
+      if (scope == 'admin') return 'admin';
+      if (scope == 'dispatcher') return 'dispatcher';
+      if (scope == 'supervisor') return 'supervisor';
+      if (scope == 'manager') return 'manager';
+      if (scope == 'fleet_manager') return 'fleet_manager';
+      return 'user';
     } catch (_) {
       return null;
     }

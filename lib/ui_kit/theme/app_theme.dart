@@ -15,13 +15,13 @@ abstract class AppTheme {
   static ThemeData get light => ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.primaryBlue,
+      seedColor: AppColors.brandAmber,
       primary: AppColors.primaryBlue,
-      onPrimary: AppColors.textOnPrimary,
-      primaryContainer: AppColors.primaryBlueLight,
+      onPrimary: AppColors.textOnDark,
+      primaryContainer: AppColors.brandDarkCard,
       secondary: AppColors.successGreen,
       onSecondary: AppColors.textOnPrimary,
-      tertiary: AppColors.accentOrange,
+      tertiary: AppColors.brandAmber,
       error: AppColors.errorRed,
       surface: AppColors.surface,
       onSurface: AppColors.textPrimary,
@@ -33,7 +33,7 @@ abstract class AppTheme {
     // ── AppBar ──────────────────────────────────────────────
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.primaryBlue,
-      foregroundColor: AppColors.textOnPrimary,
+      foregroundColor: AppColors.textOnDark,
       elevation: 2,
       shadowColor: Colors.black26,
       titleTextStyle: AppTextStyles.appBarTitle,
@@ -42,7 +42,7 @@ abstract class AppTheme {
         statusBarIconBrightness: Brightness.light,
         statusBarColor: Colors.transparent,
       ),
-      iconTheme: const IconThemeData(color: AppColors.textOnPrimary),
+      iconTheme: const IconThemeData(color: AppColors.textOnDark),
     ),
 
     // ── Cards ───────────────────────────────────────────────
@@ -60,7 +60,7 @@ abstract class AppTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryBlue,
-        foregroundColor: AppColors.textOnPrimary,
+        foregroundColor: AppColors.textOnDark,
         minimumSize: const Size.fromHeight(AppTouchTargets.btnPrimary),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
         textStyle: AppTextStyles.buttonPrimary,
@@ -74,7 +74,7 @@ abstract class AppTheme {
         foregroundColor: AppColors.primaryBlue,
         minimumSize: const Size.fromHeight(AppTouchTargets.btnSecondary),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
-        side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+        side: const BorderSide(color: AppColors.brandAmberDark, width: 1.5),
         textStyle: AppTextStyles.buttonSecondary,
       ),
     ),
@@ -119,10 +119,10 @@ abstract class AppTheme {
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
       backgroundColor: AppColors.surface,
       selectedItemColor: AppColors.primaryBlue,
-      unselectedItemColor: AppColors.neutral500,
+      unselectedItemColor: AppColors.neutral400,
       selectedLabelStyle: AppTextStyles.caption.copyWith(
         fontWeight: FontWeight.w700,
-        color: AppColors.primaryBlue,
+        color: AppColors.brandAmberDark,
       ),
       unselectedLabelStyle: AppTextStyles.caption.copyWith(
         fontWeight: FontWeight.w600,
@@ -136,7 +136,7 @@ abstract class AppTheme {
     // ── Tab Bar ──────────────────────────────────────────────
     tabBarTheme: TabBarThemeData(
       labelColor: AppColors.primaryBlue,
-      unselectedLabelColor: AppColors.neutral500,
+      unselectedLabelColor: AppColors.neutral400,
       labelStyle: AppTextStyles.labelSmall.copyWith(
         fontWeight: FontWeight.w700,
       ),
@@ -144,7 +144,7 @@ abstract class AppTheme {
       indicatorSize: TabBarIndicatorSize.tab,
       dividerColor: AppColors.neutral200,
       indicator: const UnderlineTabIndicator(
-        borderSide: BorderSide(color: AppColors.primaryBlue, width: 2),
+        borderSide: BorderSide(color: AppColors.brandAmberDark, width: 2),
       ),
     ),
 

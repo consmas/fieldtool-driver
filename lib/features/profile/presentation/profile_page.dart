@@ -115,6 +115,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (Hive.isBoxOpen(HiveBoxes.fuelLogsQueue)) {
       count += Hive.box<Map>(HiveBoxes.fuelLogsQueue).length;
     }
+    if (Hive.isBoxOpen(HiveBoxes.driverDocumentsUploadQueue)) {
+      count += Hive.box<Map>(HiveBoxes.driverDocumentsUploadQueue).length;
+    }
+    if (Hive.isBoxOpen(HiveBoxes.incidentDraftsQueue)) {
+      count += Hive.box<Map>(HiveBoxes.incidentDraftsQueue).length;
+    }
+    if (Hive.isBoxOpen(HiveBoxes.incidentEvidenceQueue)) {
+      count += Hive.box<Map>(HiveBoxes.incidentEvidenceQueue).length;
+    }
     return count;
   }
 

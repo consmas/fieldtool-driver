@@ -15,6 +15,8 @@ import '../../chat/presentation/trip_chat_page.dart';
 import '../../maintenance/presentation/maintenance_page.dart';
 import '../../offline/presentation/offline_sync_queue_page.dart';
 import '../../trips/presentation/trip_detail_page.dart';
+import '../../driver_hub/presentation/driver_hub_page.dart';
+import '../../incidents/presentation/incidents_page.dart';
 import '../data/notifications_repository.dart';
 import 'notification_preferences_page.dart';
 
@@ -209,6 +211,40 @@ class _NotificationsInboxPageState
       await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const MaintenancePage()),
+      );
+      return;
+    }
+
+    if (action == 'driver.score_published' ||
+        action == 'driver.tier_changed' ||
+        action.contains('score') ||
+        action.contains('tier')) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const DriverHubPage(initialTab: 0)),
+      );
+      return;
+    }
+
+    if (action == 'compliance.driver_document_expiring' ||
+        action == 'compliance.driver_document_expired' ||
+        action.contains('document')) {
+      final filter = (n.data['document_type'] ?? n.data['document_title'])
+          ?.toString();
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              DriverHubPage(initialTab: 1, initialDocFilter: filter),
+        ),
+      );
+      return;
+    }
+
+    if (action.contains('incident') || url.contains('/incidents')) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const IncidentsPage()),
       );
       return;
     }

@@ -18,6 +18,10 @@ Future<void> main() async {
   await Hive.openBox<Map>(HiveBoxes.maintenanceSnapshotCache);
   await Hive.openBox<Map>(HiveBoxes.fuelLogsQueue);
   await Hive.openBox<Map>(HiveBoxes.fuelLogsHistory);
+  await Hive.openBox<Map>(HiveBoxes.driverHubCache);
+  await Hive.openBox<Map>(HiveBoxes.driverDocumentsUploadQueue);
+  await Hive.openBox<Map>(HiveBoxes.incidentDraftsQueue);
+  await Hive.openBox<Map>(HiveBoxes.incidentEvidenceQueue);
   await BackgroundServiceInitializer.initialize();
 
   FlutterError.onError = (details) {

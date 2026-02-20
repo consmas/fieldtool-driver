@@ -160,11 +160,11 @@ class _CaptureEvidencePageState extends ConsumerState<CaptureEvidencePage> {
     }
   }
 
-  Future<void> _pickPhoto(
-    _EvidenceSectionState section,
-    ImageSource source,
-  ) async {
-    final file = await _picker.pickImage(source: source, imageQuality: 80);
+  Future<void> _pickPhoto(_EvidenceSectionState section) async {
+    final file = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 80,
+    );
     if (file == null) return;
 
     double? lat;
@@ -339,14 +339,7 @@ class _CaptureEvidencePageState extends ConsumerState<CaptureEvidencePage> {
                   for (final section in _sections) ...[
                     _EvidenceSectionCard(
                       section: section,
-                      onCaptureCamera: () => _pickPhoto(
-                        section,
-                        ImageSource.camera,
-                      ),
-                      onCaptureGallery: () => _pickPhoto(
-                        section,
-                        ImageSource.gallery,
-                      ),
+                      onCaptureCamera: () => _pickPhoto(section),
                       onRetryPhoto: _uploadPhoto,
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -416,13 +409,11 @@ class _EvidenceSectionCard extends StatelessWidget {
   const _EvidenceSectionCard({
     required this.section,
     required this.onCaptureCamera,
-    required this.onCaptureGallery,
     required this.onRetryPhoto,
   });
 
   final _EvidenceSectionState section;
   final VoidCallback onCaptureCamera;
-  final VoidCallback onCaptureGallery;
   final ValueChanged<_EvidencePhoto> onRetryPhoto;
 
   @override
@@ -467,14 +458,6 @@ class _EvidenceSectionCard extends StatelessWidget {
                 label: 'Camera',
                 leadingIcon: Icons.photo_camera,
                 onPressed: onCaptureCamera,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: AppSecondaryButton(
-                label: 'Gallery',
-                leadingIcon: Icons.photo_library_outlined,
-                onPressed: onCaptureGallery,
               ),
             ),
           ],

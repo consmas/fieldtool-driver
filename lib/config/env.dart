@@ -8,4 +8,9 @@ class Env {
     'GOOGLE_MAPS_API_KEY',
     defaultValue: 'AIzaSyBd9mAYtSqf58GEyOMYbvyEyL4R_VRxUOg',
   );
+
+  static const blockTripStartOnExpiredDocs = bool.fromEnvironment(
+    'BLOCK_TRIP_START_ON_EXPIRED_DOCS',
+    defaultValue: false,
+  );
 }

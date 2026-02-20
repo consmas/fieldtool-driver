@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hive/hive.dart';
 
+import '../../../config/env.dart';
 import '../../../core/utils/logger.dart';
 import '../../../ui_kit/theme/app_colors.dart';
 import '../../../ui_kit/theme/app_spacing.dart';
@@ -15,6 +16,7 @@ import '../../../ui_kit/widgets/cards.dart';
 import '../../../ui_kit/widgets/navigation.dart';
 import '../../offline/hive_boxes.dart';
 import '../../tracking/service/tracking_service.dart';
+import '../../driver_hub/data/driver_hub_repository.dart';
 import '../data/trips_repository.dart';
 import '../domain/trip.dart';
 import 'live_tracking_page.dart';
@@ -207,6 +209,20 @@ class _StartTripPageState extends ConsumerState<StartTripPage> {
     if (!_canStart || _submitting) return;
     setState(() => _submitting = true);
     try {
+      if (Env.blockTripStartOnExpiredDocs) {
+        final docsLoad = await ref
+            .read(driverHubRepositoryProvider)
+            .fetchDocuments();
+        final hasExpired = docsLoad.data.any(
+          (d) => d.status == DriverDocumentStatus.expired,
+        );
+        if (hasExpired) {
+          throw Exception(
+            'Trip start blocked: one or more driver documents are expired.',
+          );
+        }
+      }
+
       final now = DateTime.now();
       setState(() => _departureTimestamp = now);
       final repo = ref.read(tripsRepositoryProvider);
@@ -231,9 +247,7 @@ class _StartTripPageState extends ConsumerState<StartTripPage> {
       Logger.e('Start trip failed', e, st);
       if (!mounted) return;
       final msg = _friendlyStartError(e);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

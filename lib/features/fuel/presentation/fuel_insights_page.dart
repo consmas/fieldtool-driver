@@ -22,6 +22,33 @@ class _FuelInsightsPageState extends ConsumerState<FuelInsightsPage> {
   String? _error;
   DriverFuelAnalysis? _analysis;
 
+  Future<String?> _roleFromToken() async {
+    try {
+      final token = await ref.read(tokenStorageProvider).readToken();
+      if (token == null || token.isEmpty) return null;
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
+      final map = jsonDecode(payload) as Map<String, dynamic>;
+      final role = map['role']?.toString().toLowerCase();
+      if (role != null && role.isNotEmpty) return role;
+      final scope = map['scp']?.toString().toLowerCase();
+      if (scope == null || scope.isEmpty) return null;
+      if (scope == 'admin' ||
+          scope == 'dispatcher' ||
+          scope == 'supervisor' ||
+          scope == 'fleet_manager' ||
+          scope == 'manager') {
+        return scope;
+      }
+      return 'user';
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,8 +77,21 @@ class _FuelInsightsPageState extends ConsumerState<FuelInsightsPage> {
       _error = null;
     });
     try {
+      final role = await _roleFromToken();
+      final canAccess = role == 'admin' ||
+          role == 'dispatcher' ||
+          role == 'supervisor' ||
+          role == 'fleet_manager' ||
+          role == 'manager';
+      if (!canAccess) {
+        throw Exception(
+          'Fuel analysis is available only to dispatch/fleet roles.',
+        );
+      }
       final driverId = await _driverIdFromToken();
-      if (driverId == null) throw Exception('Could not determine driver id.');
+      if (driverId == null || driverId <= 0) {
+        throw Exception('Could not determine driver id.');
+      }
       final analysis = await ref
           .read(fuelRepositoryProvider)
           .fetchDriverAnalysis(driverId: driverId);

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/endpoints.dart';
@@ -158,6 +159,8 @@ class NotificationPreferences {
 class NotificationsRepository {
   NotificationsRepository(this._dio);
   final Dio _dio;
+  static const _prefsEndpointUnavailableKey =
+      'notifications_prefs_endpoint_unavailable';
 
   List<Map<String, dynamic>> _pickList(dynamic raw) {
     if (raw is List) {
@@ -184,6 +187,16 @@ class NotificationsRepository {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return Map<String, dynamic>.from(raw);
     return const <String, dynamic>{};
+  }
+
+  Future<bool> _isPrefsEndpointUnavailable() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_prefsEndpointUnavailableKey) ?? false;
+  }
+
+  Future<void> _setPrefsEndpointUnavailable(bool unavailable) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsEndpointUnavailableKey, unavailable);
   }
 
   Future<List<DriverNotification>> fetchNotifications() async {
@@ -243,18 +256,41 @@ class NotificationsRepository {
   }
 
   Future<NotificationPreferences> fetchPreferences() async {
-    final response = await _dio.get(Endpoints.notificationPreferences);
-    final map = _pickMap(
-      response.data['preferences'] ?? response.data['data'] ?? response.data,
-    );
-    return NotificationPreferences.fromJson(map);
+    if (await _isPrefsEndpointUnavailable()) {
+      return NotificationPreferences(typeEnabled: const <String, bool>{});
+    }
+    try {
+      final response = await _dio.get(Endpoints.notificationPreferences);
+      final root = _pickMap(response.data);
+      final map = _pickMap(root['preferences'] ?? root['data'] ?? root);
+      await _setPrefsEndpointUnavailable(false);
+      return NotificationPreferences.fromJson(map);
+    } on DioException catch (e) {
+      final code = e.response?.statusCode ?? 0;
+      if (code == 404 || code == 405 || code == 501) {
+        await _setPrefsEndpointUnavailable(true);
+        return NotificationPreferences(typeEnabled: const <String, bool>{});
+      }
+      rethrow;
+    }
   }
 
   Future<void> updatePreferences(NotificationPreferences preferences) async {
-    await _dio.patch(
-      Endpoints.notificationPreferences,
-      data: preferences.toApiPayload(),
-    );
+    if (await _isPrefsEndpointUnavailable()) return;
+    try {
+      await _dio.patch(
+        Endpoints.notificationPreferences,
+        data: preferences.toApiPayload(),
+      );
+      await _setPrefsEndpointUnavailable(false);
+    } on DioException catch (e) {
+      final code = e.response?.statusCode ?? 0;
+      if (code == 404 || code == 405 || code == 501) {
+        await _setPrefsEndpointUnavailable(true);
+        return;
+      }
+      rethrow;
+    }
   }
 }
 

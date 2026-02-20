@@ -12,7 +12,9 @@ import '../../../ui_kit/theme/app_colors.dart';
 import '../../../ui_kit/theme/app_spacing.dart';
 import '../../../ui_kit/widgets/badges.dart';
 import '../../../ui_kit/widgets/list_items.dart';
+import '../../driver_hub/data/driver_hub_repository.dart';
 import '../../fuel/data/fuel_repository.dart';
+import '../../incidents/data/incidents_repository.dart';
 import '../../offline/hive_boxes.dart';
 import '../../tracking/data/tracking_repository.dart';
 import '../../trips/data/trips_repository.dart';
@@ -34,6 +36,9 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
   late final Box<Map> _preTripBox;
   late final Box<Map> _pingBox;
   late final Box<Map> _fuelBox;
+  late final Box<Map> _driverDocsBox;
+  late final Box<Map> _incidentDraftsBox;
+  late final Box<Map> _incidentEvidenceBox;
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _isOffline = false;
@@ -47,6 +52,9 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
     _preTripBox = Hive.box<Map>(HiveBoxes.preTripQueue);
     _pingBox = Hive.box<Map>(HiveBoxes.trackingPings);
     _fuelBox = Hive.box<Map>(HiveBoxes.fuelLogsQueue);
+    _driverDocsBox = Hive.box<Map>(HiveBoxes.driverDocumentsUploadQueue);
+    _incidentDraftsBox = Hive.box<Map>(HiveBoxes.incidentDraftsQueue);
+    _incidentEvidenceBox = Hive.box<Map>(HiveBoxes.incidentEvidenceQueue);
     _initConnectivity();
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       final offline = !results.any((r) => r != ConnectivityResult.none);
@@ -93,6 +101,7 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
     final tripsRepo = ref.read(tripsRepositoryProvider);
     final trackingRepo = ref.read(trackingRepositoryProvider);
     final fuelRepo = ref.read(fuelRepositoryProvider);
+    final incidentsRepo = ref.read(incidentsRepositoryProvider);
 
     setState(() => _statusByEntry[entry.id] = SyncStatus.syncing);
     _addLog('Syncing ${entry.title} (${entry.kind.label})');
@@ -128,6 +137,20 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
         case _QueueKind.fuel:
           await fuelRepo.replayQueuedFuelLog(entry.payload);
           await _fuelBox.delete(entry.key);
+          break;
+        case _QueueKind.driverDoc:
+          await ref
+              .read(driverHubRepositoryProvider)
+              .replayQueuedDocumentUpload(entry.payload);
+          await _driverDocsBox.delete(entry.key);
+          break;
+        case _QueueKind.incidentDraft:
+          await incidentsRepo.replayQueuedIncidentDraft(entry.payload);
+          await _incidentDraftsBox.delete(entry.key);
+          break;
+        case _QueueKind.incidentEvidence:
+          await incidentsRepo.replayQueuedIncidentEvidence(entry.payload);
+          await _incidentEvidenceBox.delete(entry.key);
           break;
       }
       setState(() {
@@ -170,6 +193,27 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
         await _retryEntry(entry);
       }
 
+      final docEntries = _entriesForBox(_driverDocsBox, _QueueKind.driverDoc);
+      for (final entry in docEntries) {
+        await _retryEntry(entry);
+      }
+
+      final incidentDraftEntries = _entriesForBox(
+        _incidentDraftsBox,
+        _QueueKind.incidentDraft,
+      );
+      for (final entry in incidentDraftEntries) {
+        await _retryEntry(entry);
+      }
+
+      final incidentEvidenceEntries = _entriesForBox(
+        _incidentEvidenceBox,
+        _QueueKind.incidentEvidence,
+      );
+      for (final entry in incidentEvidenceEntries) {
+        await _retryEntry(entry);
+      }
+
       final pingEntries = _entriesForBox(_pingBox, _QueueKind.ping);
       for (final entry in pingEntries) {
         await _retryEntry(entry);
@@ -193,7 +237,10 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
       _mediaBox.length +
       _preTripBox.length +
       _pingBox.length +
-      _fuelBox.length;
+      _fuelBox.length +
+      _driverDocsBox.length +
+      _incidentDraftsBox.length +
+      _incidentEvidenceBox.length;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +268,15 @@ class _OfflineSyncQueuePageState extends ConsumerState<OfflineSyncQueuePage> {
                       ..._entriesForBox(_preTripBox, _QueueKind.preTrip),
                       ..._entriesForBox(_mediaBox, _QueueKind.media),
                       ..._entriesForBox(_fuelBox, _QueueKind.fuel),
+                      ..._entriesForBox(_driverDocsBox, _QueueKind.driverDoc),
+                      ..._entriesForBox(
+                        _incidentDraftsBox,
+                        _QueueKind.incidentDraft,
+                      ),
+                      ..._entriesForBox(
+                        _incidentEvidenceBox,
+                        _QueueKind.incidentEvidence,
+                      ),
                     ];
                     final p3 = _entriesForBox(_pingBox, _QueueKind.ping);
 
@@ -388,7 +444,10 @@ enum _QueueKind {
   preTrip('Pre-Trip'),
   media('Media'),
   ping('Ping'),
-  fuel('Fuel');
+  fuel('Fuel'),
+  driverDoc('Driver Doc'),
+  incidentDraft('Incident Draft'),
+  incidentEvidence('Incident Evidence');
 
   const _QueueKind(this.label);
   final String label;
@@ -399,6 +458,9 @@ enum _QueueKind {
     _QueueKind.media => Icons.photo_outlined,
     _QueueKind.ping => Icons.my_location_outlined,
     _QueueKind.fuel => Icons.local_gas_station_outlined,
+    _QueueKind.driverDoc => Icons.description_outlined,
+    _QueueKind.incidentDraft => Icons.report_outlined,
+    _QueueKind.incidentEvidence => Icons.photo_camera_back_outlined,
   };
 }
 
@@ -440,6 +502,12 @@ class _QueueEntry {
       _QueueKind.media => _mediaTitle(tripId),
       _QueueKind.ping => 'Trip #$tripId location ping',
       _QueueKind.fuel => _fuelTitle(tripId),
+      _QueueKind.driverDoc =>
+        'Driver doc upload: ${payload['title'] ?? payload['type'] ?? 'document'}',
+      _QueueKind.incidentDraft =>
+        'Incident draft: ${payload['title'] ?? payload['incident_type'] ?? 'incident'}',
+      _QueueKind.incidentEvidence =>
+        'Incident #${payload['incident_id'] ?? '-'} evidence',
     };
   }
 

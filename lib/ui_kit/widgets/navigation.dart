@@ -344,32 +344,24 @@ class ConsMasBottomNavBar extends StatelessWidget {
       onTap: onTap,
       items: [
         const BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        const BottomNavigationBarItem(
           icon: Icon(Icons.folder_outlined),
           activeIcon: Icon(Icons.folder),
           label: 'Trips',
         ),
-        const BottomNavigationBarItem(
-          icon: Icon(Icons.chat_bubble_outline),
-          activeIcon: Icon(Icons.chat_bubble),
-          label: 'Chat',
-        ),
         BottomNavigationBarItem(
-          icon: Badge(
-            isLabelVisible: pendingSyncCount > 0,
-            label: Text('$pendingSyncCount'),
-            child: const Icon(Icons.upload_outlined),
-          ),
-          activeIcon: Badge(
-            isLabelVisible: pendingSyncCount > 0,
-            label: Text('$pendingSyncCount'),
-            child: const Icon(Icons.upload),
-          ),
-          label: 'Sync',
+          icon: const Icon(Icons.verified_user_outlined),
+          activeIcon: const Icon(Icons.verified_user),
+          label: 'Compliance',
         ),
         const BottomNavigationBarItem(
-          icon: Icon(Icons.build_outlined),
-          activeIcon: Icon(Icons.build),
-          label: 'Maintenance',
+          icon: Icon(Icons.warning_amber_outlined),
+          activeIcon: Icon(Icons.warning_amber),
+          label: 'Incidents',
         ),
         const BottomNavigationBarItem(
           icon: Icon(Icons.person_outline),

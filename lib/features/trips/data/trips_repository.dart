@@ -359,6 +359,17 @@ class TripsRepository {
     await _dio.patch(Endpoints.tripPreTrip(tripId), data: formData);
   }
 
+  Future<Map<String, dynamic>> verifyTripCompliance(int tripId) async {
+    final response = await _dio.post(Endpoints.tripComplianceVerify(tripId));
+    if (response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    if (response.data is Map) {
+      return Map<String, dynamic>.from(response.data as Map);
+    }
+    return const <String, dynamic>{};
+  }
+
   Future<void> uploadOdometerStart({
     required int tripId,
     required double valueKm,

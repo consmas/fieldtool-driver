@@ -9,6 +9,8 @@ class Endpoints {
   static String tripOdometerStart(int id) => '/trips/$id/odometer/start';
   static String tripOdometerEnd(int id) => '/trips/$id/odometer/end';
   static String tripPreTrip(int id) => '/trips/$id/pre_trip';
+  static String tripComplianceVerify(int id) =>
+      '/api/v1/trips/$id/compliance/verify';
   static String tripStops(int id) => '/trips/$id/stops';
   static String tripStop(int tripId, int stopId) =>
       '/trips/$tripId/stops/$stopId';
@@ -47,4 +49,18 @@ class Endpoints {
       '/api/v1/vehicles/$vehicleId/fuel_logs';
   static String fuelAnalysisDriver(int driverId) =>
       '/api/v1/fuel/analysis/driver/$driverId';
+  static const meProfile = '/api/v1/me/profile';
+  static const meScores = '/api/v1/me/scores';
+  static const meRank = '/api/v1/me/rank';
+  static const meBadges = '/api/v1/me/badges';
+  static const meImprovementTips = '/api/v1/me/improvement_tips';
+  static const meDocuments = '/api/v1/me/documents';
+  static const meIncidents = '/api/v1/me/incidents';
+  static String meIncidentEvidence(int incidentId) =>
+      '/api/v1/me/incidents/$incidentId/evidence';
+  static String driverDocument(int driverId, int documentId) =>
+      '/api/v1/drivers/$driverId/documents/$documentId';
+  static String vehicleDocuments(int vehicleId) =>
+      '/api/v1/vehicles/$vehicleId/documents';
+  static String vehicleDetail(int vehicleId) => '/vehicles/$vehicleId';
 }
